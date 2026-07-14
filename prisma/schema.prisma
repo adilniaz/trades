@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum CompanyStatus {
+  PENDING
+  APPROVED
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  DIVIDEND
+}
+
+model User {
+  id              String        @id @default(cuid())
+  email           String        @unique
+  passwordHash    String
+  role            Role          @default(USER)
+  active          Boolean       @default(true)
+  tokenVersion    Int           @default(0)
+  failedAttempts  Int           @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime      @default(now())
+  transactions    Transaction[]
+  companyRequests Company[]     @relation("RequestedBy")
+  auditLogs       AuditLog[]
+}
+
+model Company {
+  id               String        @id @default(cuid())
+  name             String
+  ticker           String        @unique
+  // Stored as a 0-100 percentage (e.g. 4.94 = 4.94%), not a 0-1 fraction.
+  // Decimal(5,2) covers 0.00-100.00 with the 2 decimal places the source
+  // data uses. calculations.ts callers divide by 100 at the read boundary.
+  nonCompliantPct  Decimal       @db.Decimal(5, 2)
+  dividendPeriod   String?
+  // Optional structured reminder date, alongside the free-text dividendPeriod
+  // above (kept for flexibility per the original "free-text" decision).
+  nextDividendDate DateTime?
+  status           CompanyStatus @default(APPROVED)
+  requestedById    String?
+  requestedBy      User?         @relation("RequestedBy", fields: [requestedById], references: [id])
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  transactions     Transaction[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@index([status, deletedAt])
+}
+
+model Transaction {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id])
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id])
+  type          TransactionType
+  date          DateTime
+  shares        Decimal?        @db.Decimal(18, 6)
+  pricePerShare Decimal?        @db.Decimal(18, 6)
+  amount        Decimal?        @db.Decimal(18, 6)
+  purifiedAt    DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([userId, companyId, deletedAt])
+  @@index([userId, deletedAt])
+  @@index([deletedAt])
+  @@index([date])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// Records who changed what admin-controlled value, and when, for anything
+// that could silently alter historical purification figures or account
+// access. before/after store the pre-/post-change value as JSON (a single
+// field's value, not a full row snapshot) — e.g. { "nonCompliantPct": 0.43 }
+// -> { "nonCompliantPct": 0.5 }. Never edited or deleted after creation.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String // e.g. "company.update", "setting.transactionFee", "user.deactivate", "user.resetPassword"
+  targetType String // e.g. "Company", "User", "Setting"
+  targetId   String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
