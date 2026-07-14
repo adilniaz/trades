@@ -82,8 +82,7 @@ export function TransactionForm({ companyId, editing, onDone }: Props) {
     setError,
     formState: { errors },
   } = useForm<TransactionFormValues>({
-    // zodResolver v5 + Zod v4 type incompatibility
-    resolver: zodResolver(transactionFormSchema) as any,
+    resolver: zodResolver(transactionFormSchema),
     defaultValues: {
       type: (editing?.type as "BUY" | "SELL" | "DIVIDEND" | undefined) ?? "BUY",
       date: editing?.date ? toDateStr(editing.date) : "",

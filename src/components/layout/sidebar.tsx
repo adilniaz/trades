@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
 import type { Role } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,18 +48,18 @@ export function Sidebar({
   pendingCount?: number;
 }) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- standard next-themes hydration pattern
-  useEffect(() => { setMounted(true); }, []);
-
-  if (!mounted) return null;
-
+  // theme is unknown on the server (next-themes resolves it client-side from
+  // localStorage/system preference), so this text differs between server and
+  // client render on first paint. suppressHydrationWarning accepts that one-
+  // time mismatch instead of warning, matching the pattern layout.tsx already
+  // uses for the same next-themes hydration gap on <html>.
   const themeToggle = (
     <button
       type="button"
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       className="block text-left text-xs text-muted-foreground"
+      suppressHydrationWarning
     >
       {theme === "dark" ? "☀ Light" : "☾ Dark"}
     </button>

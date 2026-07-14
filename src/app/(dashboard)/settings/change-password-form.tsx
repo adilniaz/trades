@@ -18,8 +18,7 @@ export function ChangePasswordForm() {
     formState: { errors, isSubmitting },
     reset,
   } = useForm<ChangePasswordInput>({
-    // zodResolver v5 + Zod v4 type incompatibility
-    resolver: zodResolver(changePasswordSchema) as any,
+    resolver: zodResolver(changePasswordSchema),
     defaultValues: { currentPassword: "", newPassword: "" },
   });
 

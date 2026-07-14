@@ -31,8 +31,7 @@ export default function NewUserPage() {
     setValue,
     watch,
   } = useForm<CreateUserInput>({
-    // zodResolver v5 + Zod v4 type incompatibility
-    resolver: zodResolver(createUserSchema) as any,
+    resolver: zodResolver(createUserSchema),
     defaultValues: {
       email: "",
       password: "",

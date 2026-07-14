@@ -22,8 +22,7 @@ export default function RequestCompanyPage() {
     reset,
     formState: { errors },
   } = useForm<CompanyRequestInput>({
-    // zodResolver v5 + Zod v4 type incompatibility
-    resolver: zodResolver(companyRequestSchema) as any,
+    resolver: zodResolver(companyRequestSchema),
     defaultValues: { name: "", ticker: "" },
   });
 

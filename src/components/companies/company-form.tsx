@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { companySchema, type CompanyInput } from "@/lib/validation/company";
 import { Input } from "@/components/ui/input";
@@ -52,8 +52,11 @@ export function CompanyForm({
     formState: { errors, isSubmitting },
     setError,
   } = useForm<FormValues>({
-    // zodResolver v5 + Zod v4 type incompatibility
-    resolver: zodResolver(companySchema) as any,
+    // companySchema's z.preprocess on nonCompliantPct/nextDividendDate takes
+    // an untyped input, which collapses zodResolver's inferred input type to
+    // `unknown` — narrower than a blanket `any`, but still an assertion that
+    // FormValues matches what companySchema.safeParse actually accepts.
+    resolver: zodResolver(companySchema) as unknown as Resolver<FormValues>,
     defaultValues: {
       name: initial?.name ?? "",
       ticker: initial?.ticker ?? "",
