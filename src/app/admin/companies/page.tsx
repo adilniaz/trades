@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
@@ -76,7 +77,9 @@ export default async function AdminCompaniesPage({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Approved Companies ({approvedTotal})</CardTitle>
-            <CompanySearch />
+              <Suspense fallback={null}>
+                <CompanySearch />
+              </Suspense>
           </div>
         </CardHeader>
         <CardContent>
