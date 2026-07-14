@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
+import { transactionSchema } from "@/lib/validation/transaction";
 
 export type ImportResult = {
   created: number;
@@ -44,68 +46,64 @@ export async function bulkImportTransactions(
 
     const [dateStr, ticker, type, sharesStr, priceStr, amountStr] = parts;
 
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      skipped.push({ line, reason: "Invalid date" });
+    // Route through the same schema addTransaction/updateTransaction use, so
+    // a CSV row can't pass with data the form would reject.
+    const parsed = transactionSchema.safeParse({
+      type: type.toUpperCase(),
+      date: dateStr,
+      shares: sharesStr || undefined,
+      pricePerShare: priceStr || undefined,
+      amount: amountStr || undefined,
+    });
+    if (!parsed.success) {
+      skipped.push({ line, reason: parsed.error.issues[0]?.message ?? "Invalid row" });
       continue;
     }
+    const { type: txnType, date, shares, pricePerShare, amount } = parsed.data;
 
-    if (!["BUY", "SELL", "DIVIDEND"].includes(type.toUpperCase())) {
-      skipped.push({ line, reason: `Invalid type: ${type}. Must be BUY, SELL, or DIVIDEND` });
-      continue;
-    }
-
-    const company = await prisma.company.findUnique({
-      where: { ticker: ticker.toUpperCase() },
+    const company = await prisma.company.findFirst({
+      where: { ticker: ticker.toUpperCase(), deletedAt: null },
     });
 
-    if (!company || company.deletedAt || company.status !== "APPROVED") {
+    if (!company || company.status !== "APPROVED") {
       skipped.push({ line, reason: `Company not found or not approved: ${ticker}` });
       continue;
     }
 
-    const txnType = type.toUpperCase() as "BUY" | "SELL" | "DIVIDEND";
-
-    if (txnType === "DIVIDEND") {
-      const amount = amountStr ? Number(amountStr) : 0;
-      if (isNaN(amount) || amount <= 0) {
-        skipped.push({ line, reason: "Invalid amount for DIVIDEND" });
-        continue;
-      }
-
-      await prisma.transaction.create({
+    // Create + audit log are atomic per row, so a crash never leaves a
+    // transaction without its audit entry — rows still commit one at a
+    // time, matching the existing partial-import behavior for CSV files.
+    await prisma.$transaction(async (tx) => {
+      const txn = await tx.transaction.create({
         data: {
           userId: user.id,
           companyId: company.id,
           type: txnType,
           date,
-          amount,
+          shares: txnType === "DIVIDEND" ? undefined : shares,
+          pricePerShare: txnType === "DIVIDEND" ? undefined : pricePerShare,
+          amount: txnType === "DIVIDEND" ? amount : undefined,
         },
       });
-    } else {
-      const shares = sharesStr ? Number(sharesStr) : 0;
-      const price = priceStr ? Number(priceStr) : 0;
 
-      if (isNaN(shares) || shares <= 0) {
-        skipped.push({ line, reason: "Invalid shares" });
-        continue;
-      }
-      if (isNaN(price) || price <= 0) {
-        skipped.push({ line, reason: "Invalid price per share" });
-        continue;
-      }
-
-      await prisma.transaction.create({
+      await tx.auditLog.create({
         data: {
-          userId: user.id,
-          companyId: company.id,
-          type: txnType,
-          date,
-          shares,
-          pricePerShare: price,
+          actorId: user.id,
+          action: "transaction.bulkImport",
+          targetType: "Transaction",
+          targetId: txn.id,
+          before: Prisma.DbNull,
+          after: {
+            companyTicker: company.ticker,
+            type: txnType,
+            date: date.toISOString(),
+            shares: shares ?? null,
+            pricePerShare: pricePerShare ?? null,
+            amount: amount ?? null,
+          },
         },
       });
-    }
+    });
 
     created++;
   }

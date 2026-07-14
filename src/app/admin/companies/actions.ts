@@ -30,15 +30,34 @@ export async function createCompany(formData: FormData) {
 
   let company;
   try {
-    company = await prisma.company.create({
-      data: {
-        name,
-        ticker,
-        nonCompliantPct,
-        dividendPeriod: dividendPeriod ?? undefined,
-        nextDividendDate: nextDividendDate ?? undefined,
-        status: "APPROVED",
-      },
+    company = await prisma.$transaction(async (tx) => {
+      const created = await tx.company.create({
+        data: {
+          name,
+          ticker,
+          nonCompliantPct,
+          dividendPeriod: dividendPeriod ?? undefined,
+          nextDividendDate: nextDividendDate ?? undefined,
+          status: "APPROVED",
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          action: "company.create",
+          targetType: "Company",
+          targetId: created.id,
+          before: Prisma.DbNull,
+          after: {
+            name,
+            ticker,
+            nonCompliantPct: Number(created.nonCompliantPct),
+            dividendPeriod: dividendPeriod ?? null,
+            nextDividendDate: nextDividendDate ?? null,
+          },
+        },
+      });
+      return created;
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
@@ -46,23 +65,6 @@ export async function createCompany(formData: FormData) {
     }
     throw e;
   }
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "company.create",
-      targetType: "Company",
-      targetId: company.id,
-      before: Prisma.DbNull,
-      after: {
-        name,
-        ticker,
-        nonCompliantPct: Number(company.nonCompliantPct),
-        dividendPeriod: dividendPeriod ?? null,
-        nextDividendDate: nextDividendDate ?? null,
-      },
-    },
-  });
 
   revalidatePath("/admin/companies");
   return { success: true, id: company.id };
@@ -103,17 +105,34 @@ export async function updateCompany(companyId: string, formData: FormData) {
     nextDividendDate: existing.nextDividendDate,
   };
 
-  let company;
   try {
-    company = await prisma.company.update({
-      where: { id: companyId, deletedAt: null },
-      data: {
-        name,
-        ticker,
-        nonCompliantPct,
-        dividendPeriod: dividendPeriod ?? undefined,
-        nextDividendDate: nextDividendDate ?? undefined,
-      },
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.company.update({
+        where: { id: companyId, deletedAt: null },
+        data: {
+          name,
+          ticker,
+          nonCompliantPct,
+          dividendPeriod: dividendPeriod ?? undefined,
+          nextDividendDate: nextDividendDate ?? undefined,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          action: "company.update",
+          targetType: "Company",
+          targetId: updated.id,
+          before,
+          after: {
+            name,
+            ticker,
+            nonCompliantPct: Number(updated.nonCompliantPct),
+            dividendPeriod: dividendPeriod ?? null,
+            nextDividendDate: nextDividendDate ?? null,
+          },
+        },
+      });
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
@@ -124,23 +143,6 @@ export async function updateCompany(companyId: string, formData: FormData) {
     }
     throw e;
   }
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "company.update",
-      targetType: "Company",
-      targetId: company.id,
-      before,
-      after: {
-        name,
-        ticker,
-        nonCompliantPct: Number(company.nonCompliantPct),
-        dividendPeriod: dividendPeriod ?? null,
-        nextDividendDate: nextDividendDate ?? null,
-      },
-    },
-  });
 
   revalidatePath("/admin/companies");
   return { success: true };
@@ -178,20 +180,21 @@ export async function deleteCompany(companyId: string, force = false) {
     return { error: "HOLD_LIVE_TRANSACTIONS", count: company.transactions.length };
   }
 
-  await prisma.company.update({
-    where: { id: companyId, deletedAt: null },
-    data: { deletedAt: new Date() },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "company.delete",
-      targetType: "Company",
-      targetId: companyId,
-      before: { name: company.name, ticker: company.ticker },
-      after: Prisma.DbNull,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.company.update({
+      where: { id: companyId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "company.delete",
+        targetType: "Company",
+        targetId: companyId,
+        before: { name: company.name, ticker: company.ticker },
+        after: Prisma.DbNull,
+      },
+    });
   });
 
   revalidatePath("/admin/companies");
@@ -234,18 +237,36 @@ export async function approveCompanyRequest(requestId: string, formData: FormDat
     status: pending.status,
   };
 
-  let company;
   try {
-    company = await prisma.company.update({
-      where: { id: requestId, status: "PENDING", deletedAt: null },
-      data: {
-        name,
-        ticker,
-        nonCompliantPct,
-        dividendPeriod: dividendPeriod ?? undefined,
-        nextDividendDate: nextDividendDate ?? undefined,
-        status: "APPROVED",
-      },
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.company.update({
+        where: { id: requestId, status: "PENDING", deletedAt: null },
+        data: {
+          name,
+          ticker,
+          nonCompliantPct,
+          dividendPeriod: dividendPeriod ?? undefined,
+          nextDividendDate: nextDividendDate ?? undefined,
+          status: "APPROVED",
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          action: "company.approve",
+          targetType: "Company",
+          targetId: updated.id,
+          before,
+          after: {
+            name,
+            ticker,
+            nonCompliantPct: Number(updated.nonCompliantPct),
+            dividendPeriod: dividendPeriod ?? null,
+            nextDividendDate: nextDividendDate ?? null,
+            status: "APPROVED",
+          },
+        },
+      });
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
@@ -256,24 +277,6 @@ export async function approveCompanyRequest(requestId: string, formData: FormDat
     }
     throw e;
   }
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "company.approve",
-      targetType: "Company",
-      targetId: company.id,
-      before,
-      after: {
-        name,
-        ticker,
-        nonCompliantPct: Number(company.nonCompliantPct),
-        dividendPeriod: dividendPeriod ?? null,
-        nextDividendDate: nextDividendDate ?? null,
-        status: "APPROVED",
-      },
-    },
-  });
 
   revalidatePath("/admin/companies");
   return { success: true };
@@ -295,28 +298,28 @@ export async function rejectCompanyRequest(requestId: string) {
   const beforeData = { name: pending.name, ticker: pending.ticker, status: "PENDING" };
 
   // Hard delete, not soft delete — documented exception in Global Constraints.
+  // Delete and audit log are wrapped together so a failure on either side
+  // rolls back both, rather than relying on operation ordering.
   try {
-    await prisma.company.delete({ where: { id: requestId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.company.delete({ where: { id: requestId } });
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          action: "company.reject",
+          targetType: "Company",
+          targetId: requestId,
+          before: beforeData,
+          after: Prisma.DbNull,
+        },
+      });
+    });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
       return { error: "Company request not found or already processed" };
     }
     throw e;
   }
-
-  // Write audit log AFTER the delete succeeds, so we never log an action
-  // that didn't actually complete (the old ordering logged first, creating
-  // an orphaned audit entry if the delete threw).
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "company.reject",
-      targetType: "Company",
-      targetId: requestId,
-      before: beforeData,
-      after: Prisma.DbNull,
-    },
-  });
 
   revalidatePath("/admin/companies");
   return { success: true };
@@ -348,73 +351,60 @@ export async function bulkImportCompanies(csvText: string): Promise<ImportResult
       continue;
     }
 
-    const name = parts[0];
-    const ticker = parts[1].toUpperCase();
-    const pctRaw = parts[2];
+    // Route through the same schema the "Add company" form uses, so a CSV
+    // row can't pass with data the form would reject (or vice versa).
+    const parsed = companySchema.safeParse({
+      name: parts[0],
+      ticker: parts[1],
+      nonCompliantPct: parts[2],
+    });
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0]?.message ?? "Invalid row";
+      result.skipped.push({ row: rowNum, reason: firstIssue });
+      continue;
+    }
+    const { name, ticker, nonCompliantPct } = parsed.data;
 
-    if (!name || !ticker) {
-      result.skipped.push({ row: rowNum, reason: "Missing name or ticker" });
+    // Check for duplicate ticker among active companies only. A soft-deleted
+    // company's ticker is free to reuse — uniqueness is enforced by a
+    // partial unique index (WHERE "deletedAt" IS NULL, see schema.prisma),
+    // so no mangling/recycling workaround is needed here.
+    const existing = await prisma.company.findFirst({
+      where: { ticker, deletedAt: null },
+    });
+    if (existing) {
+      result.skipped.push({ row: rowNum, reason: `Ticker ${ticker} already exists` });
       continue;
     }
 
-    // Check for duplicate ticker — the @unique constraint covers ALL rows,
-    // not just active ones. A soft-deleted company still occupies the ticker.
-    const existing = await prisma.company.findUnique({
-      where: { ticker },
-    });
-    if (existing) {
-      // Check both non-deleted and soft-deleted — the ticker @unique constraint
-      // covers ALL rows, not just active ones. A soft-deleted company still
-      // occupies the ticker, so creating a new one with the same ticker would
-      // crash with a unique constraint violation. We can "recycle" the ticker
-      // by clearing it from the soft-deleted row first.
-      if (existing.deletedAt === null) {
-        result.skipped.push({ row: rowNum, reason: `Ticker ${ticker} already exists` });
-        continue;
-      }
-      // Soft-deleted: free the ticker by appending a deletion suffix, so the
-      // new import can claim it without a constraint violation.
-      await prisma.company.update({
-        where: { id: existing.id },
-        data: { ticker: `${ticker}_DELETED_${existing.id.slice(0, 8)}` },
-      });
-    }
-
-    let nonCompliantPct = 0;
-    if (pctRaw) {
-      const n = parseFloat(pctRaw);
-      if (isNaN(n) || n < 0 || n > 100) {
-        result.skipped.push({
-          row: rowNum,
-          reason: `Invalid nonCompliantPct "${pctRaw}"`,
-        });
-        continue;
-      }
-      nonCompliantPct = n;
-    }
-
-    const company = await prisma.company.create({
-      data: {
-        name,
-        ticker,
-        nonCompliantPct,
-        status: "APPROVED",
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        actorId: admin.id,
-        action: "company.bulkImport",
-        targetType: "Company",
-        targetId: company.id,
-        before: Prisma.DbNull,
-        after: {
+    // Each row's create + audit log is atomic, so a crash never leaves a
+    // company without its audit entry — but rows are still committed one at
+    // a time (not one big transaction), preserving today's partial-import
+    // behavior where earlier rows in the file survive a later row's failure.
+    await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
+        data: {
           name,
           ticker,
-          nonCompliantPct: Number(company.nonCompliantPct),
+          nonCompliantPct,
+          status: "APPROVED",
         },
-      },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: admin.id,
+          action: "company.bulkImport",
+          targetType: "Company",
+          targetId: company.id,
+          before: Prisma.DbNull,
+          after: {
+            name,
+            ticker,
+            nonCompliantPct: Number(company.nonCompliantPct),
+          },
+        },
+      });
     });
 
     result.created++;
