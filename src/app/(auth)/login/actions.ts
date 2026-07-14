@@ -1,8 +1,19 @@
 "use server";
 
+import { headers } from "next/headers";
+import { unstable_rethrow } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { loginSchema } from "@/lib/validation/auth";
 import { logger } from "@/lib/logger";
+import { isIpThrottled, recordFailedAttempt } from "@/lib/ip-rate-limit";
+
+async function getClientIp(): Promise<string> {
+  const h = await headers();
+  // First entry is the original client per the standard convention; falls
+  // back to a shared bucket if the header is absent (e.g. proxy misconfig)
+  // rather than throwing.
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
 
 export async function loginAction(
   _prevState: { error?: string } | undefined,
@@ -14,6 +25,15 @@ export async function loginAction(
   });
   if (!parsed.success) return { error: "Invalid email or password" };
 
+  const ip = await getClientIp();
+  // IP-keyed backstop against credential stuffing across many accounts —
+  // per-account lockout (src/lib/rate-limit.ts) already covers repeated
+  // attempts against one email. Same generic error either way, so a
+  // throttled attempt can't be distinguished from a wrong password.
+  if (isIpThrottled(ip)) {
+    return { error: "Invalid email or password" };
+  }
+
   try {
     await signIn("credentials", {
       ...parsed.data,
@@ -21,12 +41,19 @@ export async function loginAction(
     });
     return {};
   } catch (err) {
+    // signIn() throws Next's internal redirect error on *success* too (it
+    // calls redirect() itself) — re-throw framework control-flow errors so
+    // the redirect actually happens, instead of counting a successful login
+    // as a failed attempt below.
+    unstable_rethrow(err);
+
     // Always return a generic message — non-AuthError exceptions (Prisma
     // errors, DB connection failures, null dereferences) must not leak
     // stack traces or internal details to the client.
     if (err instanceof Error) {
       logger.error({ msg: err.message }, "Login error");
     }
+    recordFailedAttempt(ip);
     return { error: "Invalid email or password" };
   }
 }
