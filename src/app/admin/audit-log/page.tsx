@@ -1,13 +1,6 @@
 import { requireAuth } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 function renderJson(v: unknown): string {
@@ -15,14 +8,28 @@ function renderJson(v: unknown): string {
   return JSON.stringify(v);
 }
 
-export default async function AuditLogPage() {
+const DEFAULT_PAGE_SIZE = 30;
+
+export default async function AuditLogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
+}) {
   await requireAuth({ roles: ["ADMIN"] });
 
-  const logs = await prisma.auditLog.findMany({
-    include: { actor: { select: { email: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(sp.pageSize) || DEFAULT_PAGE_SIZE));
+
+  const [logs, totalCount] = await Promise.all([
+    prisma.auditLog.findMany({
+      include: { actor: { select: { email: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.auditLog.count(),
+  ]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -30,47 +37,43 @@ export default async function AuditLogPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity ({logs.length})</CardTitle>
+          <CardTitle>Recent Activity ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent>
-          {logs.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">
-              No audit log entries yet.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Admin</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Before</TableHead>
-                  <TableHead>After</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {new Date(entry.createdAt).toISOString().slice(0, 19).replace("T", " ")}
-                    </TableCell>
-                    <TableCell>{entry.actor.email}</TableCell>
-                    <TableCell>{entry.action}</TableCell>
-                    <TableCell>
-                      {entry.targetType} #{entry.targetId.slice(0, 8)}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-xs font-mono">
-                      {renderJson(entry.before)}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-xs font-mono">
-                      {renderJson(entry.after)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            columns={[
+              { key: "when", header: "When" },
+              { key: "admin", header: "Admin" },
+              { key: "action", header: "Action" },
+              { key: "target", header: "Target" },
+              { key: "before", header: "Before" },
+              { key: "after", header: "After" },
+            ]}
+            rows={logs.map((entry) => ({
+              when: (
+                <span className="whitespace-nowrap">
+                  {new Date(entry.createdAt).toISOString().slice(0, 19).replace("T", " ")}
+                </span>
+              ),
+              admin: entry.actor.email,
+              action: entry.action,
+              target: `${entry.targetType} #${entry.targetId.slice(0, 8)}`,
+              before: (
+                <span className="max-w-xs truncate text-xs font-mono block">
+                  {renderJson(entry.before)}
+                </span>
+              ),
+              after: (
+                <span className="max-w-xs truncate text-xs font-mono block">
+                  {renderJson(entry.after)}
+                </span>
+              ),
+            }))}
+            totalCount={totalCount}
+            page={page}
+            pageSize={pageSize}
+            baseUrl="/admin/audit-log"
+          />
         </CardContent>
       </Card>
     </div>

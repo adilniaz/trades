@@ -22,7 +22,7 @@ export default function RequestCompanyPage() {
     reset,
     formState: { errors },
   } = useForm<CompanyRequestInput>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // zodResolver v5 + Zod v4 type incompatibility
     resolver: zodResolver(companyRequestSchema) as any,
     defaultValues: { name: "", ticker: "" },
   });

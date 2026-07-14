@@ -2,6 +2,7 @@
 
 import { signIn } from "@/lib/auth";
 import { loginSchema } from "@/lib/validation/auth";
+import { logger } from "@/lib/logger";
 
 export async function loginAction(
   _prevState: { error?: string } | undefined,
@@ -23,7 +24,9 @@ export async function loginAction(
     // Always return a generic message — non-AuthError exceptions (Prisma
     // errors, DB connection failures, null dereferences) must not leak
     // stack traces or internal details to the client.
-    console.error("Login error:", err instanceof Error ? err.message : err);
+    if (err instanceof Error) {
+      logger.error({ msg: err.message }, "Login error");
+    }
     return { error: "Invalid email or password" };
   }
 }

@@ -1,50 +1,74 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { deleteCompany } from "@/app/admin/companies/actions";
+import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
-type Props = {
-  companyId: string;
-};
+export function DeleteCompanyButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [forceWarning, setForceWarning] = useState<string | null>(null);
 
-export function DeleteCompanyButton({ companyId }: Props) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  const handleDelete = () => {
-    if (!confirm("Are you sure you want to delete this company?")) return;
-
-    startTransition(async () => {
-      const result = await deleteCompany(companyId);
-      if (result.error === "HOLD_LIVE_TRANSACTIONS") {
-        const forceful = confirm(
-          `This company has active (non-deleted) transactions. Deleting will soft-delete the company but leave transactions intact. Continue?`
-        );
-        if (!forceful) return;
-        const retry = await deleteCompany(companyId, true);
-        if (retry.error) {
-          window.alert(String(retry.error));
+  async function handleDelete() {
+    try {
+      const result = await deleteCompany(id);
+      if (result) {
+        const err = (result as { error?: unknown }).error;
+        if (typeof err === "object" && err !== null && "count" in err) {
+          setForceWarning(`${(err as { count: number }).count} user(s) hold live transactions. Delete anyway?`);
+          return;
         }
-      } else if (result.error) {
-        setError(String(result.error));
+        if (err) toast.error(typeof err === "string" ? err : "Failed to delete company");
       }
-    });
-  };
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete company");
+    }
+  }
+
+  async function handleForceDelete() {
+    try {
+      const result = await deleteCompany(id, true);
+      if (result) {
+        const err = (result as { error?: unknown }).error;
+        if (err) toast.error(typeof err === "string" ? err : "Failed to delete company");
+      }
+      setForceWarning(null);
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete company");
+    }
+  }
+
+  if (forceWarning) {
+    return (
+      <ConfirmationDialog
+        title="Delete company with active holdings?"
+        description={forceWarning}
+        confirmLabel="Delete anyway"
+        variant="destructive"
+        onConfirm={handleForceDelete}
+      >
+        <Button size="sm" variant="outline">
+          Delete
+        </Button>
+      </ConfirmationDialog>
+    );
+  }
 
   return (
-    <>
-      <Button
-        variant="destructive"
-        size="xs"
-        onClick={handleDelete}
-        disabled={pending}
-      >
-        {pending ? "Deleting…" : "Delete"}
+    <ConfirmationDialog
+      title="Delete this company?"
+      description="This will soft-delete the company. Transactions are preserved."
+      confirmLabel="Delete"
+      variant="destructive"
+      onConfirm={handleDelete}
+    >
+      <Button size="sm" variant="outline">
+        Delete
       </Button>
-      {error && (
-        <span className="text-xs text-red-600 ml-1">{error}</span>
-      )}
-    </>
+    </ConfirmationDialog>
   );
 }

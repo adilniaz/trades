@@ -16,6 +16,10 @@ export default async function SettingsPage() {
       <a href="/api/export" className="text-sm underline">
         Export my transactions (CSV)
       </a>
+      <br />
+      <a href="/api/export/holdings" className="text-sm underline">
+        Export my holdings (CSV)
+      </a>
       <ChangePasswordForm />
     </div>
   );

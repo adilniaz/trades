@@ -17,12 +17,7 @@ import {
 } from "@/components/ui/select";
 import { createUser } from "@/app/admin/users/actions";
 import { useTransition, useCallback } from "react";
-
-type FormValues = {
-  email: string;
-  password: string;
-  role: "ADMIN" | "USER";
-};
+import { PasswordStrengthMeter } from "@/components/ui/password-strength";
 
 export default function NewUserPage() {
   const router = useRouter();
@@ -35,8 +30,8 @@ export default function NewUserPage() {
     setError,
     setValue,
     watch,
-  } = useForm<FormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } = useForm<CreateUserInput>({
+    // zodResolver v5 + Zod v4 type incompatibility
     resolver: zodResolver(createUserSchema) as any,
     defaultValues: {
       email: "",
@@ -46,11 +41,12 @@ export default function NewUserPage() {
   });
 
   const roleValue = watch("role");
+  const passwordValue = watch("password");
 
   const submit = useCallback(
-    async (data: FormValues) => {
+    async (data: CreateUserInput) => {
       startTransition(async () => {
-        const raw = (await createUser(data as unknown as CreateUserInput)) as
+        const raw = (await createUser(data)) as
           | Record<string, unknown>
           | undefined;
         if (
@@ -63,7 +59,7 @@ export default function NewUserPage() {
           const fieldErrors = raw.error as Record<string, string[]>;
           for (const [field, messages] of Object.entries(fieldErrors)) {
             if (messages.length > 0) {
-              setError(field as keyof FormValues, { message: messages[0] });
+              setError(field as keyof CreateUserInput, { message: messages[0] });
             }
           }
           return;
@@ -114,6 +110,7 @@ export default function NewUserPage() {
               {errors.password && (
                 <p className="text-sm text-red-600">{errors.password.message}</p>
               )}
+              <PasswordStrengthMeter password={passwordValue} />
             </div>
 
             <div className="space-y-2">

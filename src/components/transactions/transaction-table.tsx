@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   TransactionForm,
   type Transaction,
@@ -51,7 +53,11 @@ export function TransactionTable({ companyId, transactions }: Props) {
   const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleEditDone = () => {
+    setEditingId(null);
+    router.refresh();
+  };
 
   if (transactions.length === 0) {
     return (
@@ -59,30 +65,8 @@ export function TransactionTable({ companyId, transactions }: Props) {
     );
   }
 
-  const handleDelete = (id: string) => {
-    if (!confirm("Delete this transaction?")) return;
-    startTransition(async () => {
-      setDeleteError(null);
-      const result = await deleteTransaction(id, companyId);
-      if (result.error) {
-        setDeleteError(String(result.error));
-      } else {
-        router.refresh();
-      }
-    });
-  };
-
-  const handleEditDone = () => {
-    setEditingId(null);
-    router.refresh();
-  };
-
   return (
     <div className="space-y-2">
-      {deleteError && (
-        <p className="text-sm text-red-600">{deleteError}</p>
-      )}
-
       <Table>
         <TableHeader>
           <TableRow>
@@ -134,14 +118,27 @@ export function TransactionTable({ companyId, transactions }: Props) {
                     >
                       Edit
                     </Button>
-                    <Button
-                      size="xs"
+                    <ConfirmationDialog
+                      title="Delete this transaction?"
+                      description="This cannot be undone."
+                      confirmLabel="Delete"
                       variant="destructive"
-                      onClick={() => handleDelete(txn.id)}
-                      disabled={isPending}
+                      onConfirm={() =>
+                        new Promise<void>((resolve) => {
+                          startTransition(async () => {
+                            const result = await deleteTransaction(txn.id, companyId);
+                            if (result.error) toast.error(String(result.error));
+                            else toast.success("Transaction deleted");
+                            router.refresh();
+                            resolve();
+                          });
+                        })
+                      }
                     >
-                      {isPending ? "…" : "Delete"}
-                    </Button>
+                      <Button size="xs" variant="destructive" disabled={isPending}>
+                        Delete
+                      </Button>
+                    </ConfirmationDialog>
                   </div>
                 </TableCell>
               </TableRow>

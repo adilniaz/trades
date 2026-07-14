@@ -82,7 +82,7 @@ export function TransactionForm({ companyId, editing, onDone }: Props) {
     setError,
     formState: { errors },
   } = useForm<TransactionFormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // zodResolver v5 + Zod v4 type incompatibility
     resolver: zodResolver(transactionFormSchema) as any,
     defaultValues: {
       type: (editing?.type as "BUY" | "SELL" | "DIVIDEND" | undefined) ?? "BUY",

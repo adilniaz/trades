@@ -1,31 +1,39 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
 import { UserRowActions } from "@/app/admin/users/user-row-actions";
 
-export default async function AdminUsersPage() {
+const DEFAULT_PAGE_SIZE = 20;
+
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
+}) {
   await requireAuth({ roles: ["ADMIN"] });
 
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      email: true,
-      role: true,
-      active: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(sp.pageSize) || DEFAULT_PAGE_SIZE));
+
+  const [users, totalCount] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        active: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.user.count(),
+  ]);
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -38,46 +46,31 @@ export default async function AdminUsersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Users ({users.length})</CardTitle>
+          <CardTitle>Users ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">
-              No users yet.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-48">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.email}</TableCell>
-                    <TableCell>{u.role}</TableCell>
-                    <TableCell>
-                      {u.active ? (
-                        <span className="text-green-600 font-medium">Active</span>
-                      ) : (
-                        <span className="text-red-600 font-medium">Inactive</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <UserRowActions
-                        userId={u.id}
-                        active={u.active}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            columns={[
+              { key: "email", header: "Email" },
+              { key: "role", header: "Role" },
+              { key: "status", header: "Status" },
+              { key: "actions", header: "Actions", className: "w-48" },
+            ]}
+            rows={users.map((u) => ({
+              email: <span className="font-medium">{u.email}</span>,
+              role: u.role,
+              status: u.active ? (
+                <span className="text-green-600 font-medium">Active</span>
+              ) : (
+                <span className="text-red-600 font-medium">Inactive</span>
+              ),
+              actions: <UserRowActions userId={u.id} active={u.active} />,
+            }))}
+            totalCount={totalCount}
+            page={page}
+            pageSize={pageSize}
+            baseUrl="/admin/users"
+          />
         </CardContent>
       </Card>
     </div>

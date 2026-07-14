@@ -7,7 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
-/** Field values as they live in the form state (before zod validation). */
+/** Field values as they live in the form state (before zod validation).
+ * Derived manually because companySchema uses z.preprocess which makes
+ * z.input<typeof companySchema> too wide (unknown); the form uses typed
+ * inputs (number, date string), so this manual type is intentionally narrower. */
 type FormValues = {
   name: string;
   ticker: string;
@@ -49,7 +52,7 @@ export function CompanyForm({
     formState: { errors, isSubmitting },
     setError,
   } = useForm<FormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // zodResolver v5 + Zod v4 type incompatibility
     resolver: zodResolver(companySchema) as any,
     defaultValues: {
       name: initial?.name ?? "",

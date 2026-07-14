@@ -7,22 +7,26 @@ import { changePasswordSchema, type ChangePasswordInput } from "@/lib/validation
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { PasswordStrengthMeter } from "@/components/ui/password-strength";
 import { changePassword } from "./actions";
 
 export function ChangePasswordForm() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<ChangePasswordInput>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // zodResolver v5 + Zod v4 type incompatibility
     resolver: zodResolver(changePasswordSchema) as any,
     defaultValues: { currentPassword: "", newPassword: "" },
   });
 
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  const newPasswordValue = watch("newPassword");
 
   const submit = async (data: ChangePasswordInput) => {
     setServerError(null);
@@ -53,6 +57,7 @@ export function ChangePasswordForm() {
         {errors.newPassword && (
           <p className="text-sm text-red-600">{errors.newPassword.message}</p>
         )}
+        <PasswordStrengthMeter password={newPasswordValue} />
       </div>
 
       {serverError && <p className="text-sm text-red-600">{serverError}</p>}

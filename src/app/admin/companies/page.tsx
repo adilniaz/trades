@@ -1,33 +1,51 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
 import { PendingRequestsTable } from "@/components/companies/pending-requests-table";
 import { DeleteCompanyButton } from "@/components/companies/delete-company-button";
+import { CompanySearch } from "@/components/companies/company-search";
 
-export default async function AdminCompaniesPage() {
+const DEFAULT_PAGE_SIZE = 20;
+
+export default async function AdminCompaniesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; pageSize?: string; q?: string }>;
+}) {
   await requireAuth({ roles: ["ADMIN"] });
 
-  const [approved, pending] = await Promise.all([
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(sp.pageSize) || DEFAULT_PAGE_SIZE));
+  const query = sp.q?.trim() || "";
+
+  const approvedWhere = {
+    status: "APPROVED" as const,
+    deletedAt: null,
+    ...(query
+      ? { OR: [{ name: { contains: query } }, { ticker: { contains: query } }] }
+      : {}),
+  };
+
+  const [approved, approvedTotal, pending] = await Promise.all([
     prisma.company.findMany({
-      where: { status: "APPROVED", deletedAt: null },
+      where: approvedWhere,
       orderBy: { name: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
+    prisma.company.count({ where: approvedWhere }),
     prisma.company.findMany({
       where: { status: "PENDING", deletedAt: null },
       include: { requestedBy: { select: { email: true } } },
       orderBy: { createdAt: "desc" },
     }),
   ]);
+
+  const baseUrl = `/admin/companies${query ? `?q=${encodeURIComponent(query)}` : ""}`;
 
   return (
     <div className="p-6 space-y-8 max-w-6xl mx-auto">
@@ -56,52 +74,45 @@ export default async function AdminCompaniesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Approved Companies ({approved.length})</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Approved Companies ({approvedTotal})</CardTitle>
+            <CompanySearch />
+          </div>
         </CardHeader>
         <CardContent>
-          {approved.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">
-              No approved companies yet. Add one or bulk import.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Ticker</TableHead>
-                  <TableHead>Non-compliant %</TableHead>
-                  <TableHead>Dividend period</TableHead>
-                  <TableHead>Next dividend</TableHead>
-                  <TableHead className="w-32">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {approved.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.ticker}</TableCell>
-                    <TableCell>{Number(c.nonCompliantPct)}%</TableCell>
-                    <TableCell>{c.dividendPeriod ?? "—"}</TableCell>
-                    <TableCell>
-                      {c.nextDividendDate
-                        ? new Date(c.nextDividendDate).toISOString().slice(0, 10)
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Link href={`/admin/companies/${c.id}/edit`}>
-                          <Button variant="outline" size="xs">
-                            Edit
-                          </Button>
-                        </Link>
-                        <DeleteCompanyButton companyId={c.id} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            columns={[
+              { key: "name", header: "Name" },
+              { key: "ticker", header: "Ticker" },
+              { key: "nonCompliantPct", header: "Non-compliant %" },
+              { key: "dividendPeriod", header: "Dividend period" },
+              { key: "nextDividend", header: "Next dividend" },
+              { key: "actions", header: "Actions", className: "w-32" },
+            ]}
+            rows={approved.map((c) => ({
+              name: <span className="font-medium">{c.name}</span>,
+              ticker: c.ticker,
+              nonCompliantPct: `${Number(c.nonCompliantPct)}%`,
+              dividendPeriod: c.dividendPeriod ?? "—",
+              nextDividend: c.nextDividendDate
+                ? new Date(c.nextDividendDate).toISOString().slice(0, 10)
+                : "—",
+              actions: (
+                <div className="flex gap-1">
+                  <Link href={`/admin/companies/${c.id}/edit`}>
+                    <Button variant="outline" size="xs">
+                      Edit
+                    </Button>
+                  </Link>
+                  <DeleteCompanyButton id={c.id} />
+                </div>
+              ),
+            }))}
+            totalCount={approvedTotal}
+            page={page}
+            pageSize={pageSize}
+            baseUrl={baseUrl}
+          />
         </CardContent>
       </Card>
     </div>

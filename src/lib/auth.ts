@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validation/auth";
 import { isLockedOut, nextLockoutState, resetLockoutState } from "@/lib/rate-limit";
@@ -67,6 +68,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               where: { id: user.id },
               data: state,
             });
+            if (state.lockedUntil) {
+              await tx.auditLog.create({
+                data: {
+                  actorId: user.id,
+                  action: "user.lockedOut",
+                  targetType: "User",
+                  targetId: user.id,
+                  before: { note: "5 failed login attempts" },
+                  after: { note: `Locked until ${state.lockedUntil.toISOString()}` },
+                },
+              });
+            }
           });
           return null;
         }
@@ -76,6 +89,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // concurrency guard is needed — a concurrent write to the same fields
         // with safe defaults can't corrupt anything.
         await prisma.user.update({ where: { id: user.id }, data: resetLockoutState });
+
+        // Log successful login
+        await prisma.auditLog.create({
+          data: {
+            actorId: user.id,
+            action: "user.login",
+            targetType: "User",
+            targetId: user.id,
+            before: Prisma.DbNull,
+            after: Prisma.DbNull,
+          },
+        });
 
         return {
           id: user.id,

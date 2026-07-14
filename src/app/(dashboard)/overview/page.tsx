@@ -11,6 +11,7 @@ import {
 } from "@/lib/calculations";
 import { toTxn } from "@/lib/to-txn";
 import { HoldingsTable, type HoldingRow } from "@/components/holdings/holdings-table";
+import { PurificationChart } from "@/components/holdings/purification-chart";
 
 export default async function OverviewPage() {
   const user = await requireAuth();
@@ -77,6 +78,8 @@ export default async function OverviewPage() {
           </div>
         </div>
       </div>
+
+      <PurificationChart rows={rows} />
 
       <HoldingsTable rows={rows} />
     </div>
