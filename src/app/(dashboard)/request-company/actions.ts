@@ -8,7 +8,11 @@ import { companyRequestSchema } from "@/lib/validation/company-request";
 
 export async function requestCompany(input: unknown) {
   const user = await requireAuth();
-  const data = companyRequestSchema.parse(input);
+  const parsed = companyRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const data = parsed.data;
   try {
     await prisma.company.create({
       data: {

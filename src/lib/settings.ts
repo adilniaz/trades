@@ -2,6 +2,7 @@
 // one instance will not invalidate the cache on other instances until the TTL
 // expires (max 60s staleness). This is acceptable for the settings use case.
 
+import type { PrismaClient, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export interface AppSettings {
@@ -31,13 +32,20 @@ export async function getSettings(): Promise<AppSettings> {
   return cache;
 }
 
-export async function setTransactionFee(fee: number): Promise<void> {
-  await prisma.setting.upsert({
+export async function setTransactionFee(
+  fee: number,
+  client: PrismaClient | Prisma.TransactionClient = prisma
+): Promise<void> {
+  await client.setting.upsert({
     where: { key: "transactionFee" },
     update: { value: String(fee) },
     create: { key: "transactionFee", value: String(fee) },
   });
 
-  // Invalidate the cache so the next read picks up the new value.
+  // Invalidate the cache so the next read picks up the new value. Done
+  // outside any transaction the caller passed in — this is a pure in-memory
+  // op with no failure mode, so it's correct to run it once the write is
+  // known to have succeeded (the caller awaits the transaction before this
+  // returns), rather than trying to make it part of the transaction itself.
   cache = null;
 }

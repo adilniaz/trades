@@ -15,7 +15,7 @@ export function SettingsForm({ currentFee }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [fee, setFee] = useState(String(currentFee));
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,17 +23,21 @@ export function SettingsForm({ currentFee }: Props) {
 
     const num = Number(fee);
     if (isNaN(num) || num < 0 || !isFinite(num)) {
-      setMessage("Please enter a valid non-negative number");
+      setMessage({ type: "error", text: "Please enter a valid non-negative number" });
       return;
     }
 
     startTransition(async () => {
       try {
-        await updateTransactionFee({ transactionFee: num });
-        setMessage("Saved.");
+        const result = await updateTransactionFee({ transactionFee: num });
+        if (result && "error" in result) {
+          setMessage({ type: "error", text: result.error as string });
+          return;
+        }
+        setMessage({ type: "success", text: "Saved." });
         router.refresh();
       } catch (e) {
-        setMessage(e instanceof Error ? e.message : "Failed to save");
+        setMessage({ type: "error", text: e instanceof Error ? e.message : "Failed to save" });
       }
     });
   };
@@ -55,7 +59,11 @@ export function SettingsForm({ currentFee }: Props) {
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving…" : "Save"}
         </Button>
-        {message && <p className="text-sm text-green-600">{message}</p>}
+        {message && (
+          <p className={`text-sm ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
+            {message.text}
+          </p>
+        )}
       </div>
     </form>
   );

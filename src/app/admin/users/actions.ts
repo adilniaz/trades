@@ -28,19 +28,21 @@ export async function createUser(input: unknown) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const user = await prisma.user.create({
-    data: { email, passwordHash, role },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "user.create",
-      targetType: "User",
-      targetId: user.id,
-      before: Prisma.DbNull,
-      after: { email: user.email, role: user.role, active: user.active },
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: { email, passwordHash, role },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "user.create",
+        targetType: "User",
+        targetId: created.id,
+        before: Prisma.DbNull,
+        after: { email: created.email, role: created.role, active: created.active },
+      },
+    });
+    return created;
   });
 
   revalidatePath("/admin/users");
@@ -57,25 +59,26 @@ export async function setUserActive(id: string, active: boolean) {
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) return { error: "User not found" };
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      active,
-      // Bump tokenVersion so any active sessions for this user are
-      // invalidated immediately on the next proxy check.
-      tokenVersion: { increment: 1 },
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: active ? "user.activate" : "user.deactivate",
-      targetType: "User",
-      targetId: user.id,
-      before: { active: existing.active },
-      after: { active: user.active },
-    },
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id },
+      data: {
+        active,
+        // Bump tokenVersion so any active sessions for this user are
+        // invalidated immediately on the next proxy check.
+        tokenVersion: { increment: 1 },
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: active ? "user.activate" : "user.deactivate",
+        targetType: "User",
+        targetId: updated.id,
+        before: { active: existing.active },
+        after: { active: updated.active },
+      },
+    });
   });
 
   revalidatePath("/admin/users");
@@ -99,25 +102,26 @@ export async function resetUserPassword(id: string, input: unknown) {
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
-  await prisma.user.update({
-    where: { id },
-    data: {
-      passwordHash,
-      tokenVersion: { increment: 1 },
-      failedAttempts: 0,
-      lockedUntil: null,
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "user.resetPassword",
-      targetType: "User",
-      targetId: id,
-      before: { note: "password hash (redacted)" },
-      after: { note: "password hash (redacted)" },
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        tokenVersion: { increment: 1 },
+        failedAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "user.resetPassword",
+        targetType: "User",
+        targetId: id,
+        before: { note: "password hash (redacted)" },
+        after: { note: "password hash (redacted)" },
+      },
+    });
   });
 
   revalidatePath("/admin/users");
