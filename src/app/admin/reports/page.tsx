@@ -54,6 +54,11 @@ export default async function AdminReportsPage() {
         orderBy: { date: "asc" },
       },
     },
+    // Safety cap: this is the one query in the app that grows with total
+    // transaction volume across every user, not just one. 500 is well above
+    // current scale; if the company count ever approaches it, replace this
+    // with real pagination rather than raising the cap.
+    take: 500,
   });
 
   // Group transactions by user id, then by company.

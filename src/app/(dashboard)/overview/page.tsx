@@ -1,16 +1,8 @@
 import { requireAuth } from "@/lib/auth-guard";
 import { getSettings } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
-import {
-  position,
-  avgCost,
-  realizedGains,
-  purifiableGains,
-  purifiableDividends,
-  breakeven,
-} from "@/lib/calculations";
-import { toTxn } from "@/lib/to-txn";
-import { HoldingsTable, type HoldingRow } from "@/components/holdings/holdings-table";
+import { computeHoldings } from "@/lib/holdings";
+import { HoldingsTable } from "@/components/holdings/holdings-table";
 import { PurificationChart } from "@/components/holdings/purification-chart";
 
 export default async function OverviewPage() {
@@ -28,33 +20,7 @@ export default async function OverviewPage() {
     orderBy: { name: "asc" },
   });
 
-  const rows: HoldingRow[] = [];
-
-  for (const c of companies) {
-    if (c.transactions.length === 0) continue;
-
-    const txns = c.transactions.map(toTxn);
-    const nonCompliantPct = Number(c.nonCompliantPct) / 100;
-
-    const sharesHeld = position(txns);
-    const ac = avgCost(txns);
-    const gains = realizedGains(txns);
-    const purGains = purifiableGains(txns, nonCompliantPct);
-    const purDivs = purifiableDividends(txns, nonCompliantPct);
-    const be = breakeven(txns, settings.transactionFee);
-
-    rows.push({
-      companyId: c.id,
-      name: c.name,
-      ticker: c.ticker,
-      sharesHeld,
-      avgCost: ac,
-      realizedGains: gains,
-      breakeven: be,
-      gainsToPurify: purGains,
-      dividendsToPurify: purDivs,
-    });
-  }
+  const rows = computeHoldings(companies, settings);
 
   const totalGainsToPurify = rows.reduce((sum, r) => sum + r.gainsToPurify, 0);
   const totalDividendsToPurify = rows.reduce((sum, r) => sum + r.dividendsToPurify, 0);
