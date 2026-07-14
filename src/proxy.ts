@@ -34,7 +34,19 @@ export default auth(async (req) => {
     }
   }
 
-  const res = NextResponse.next();
+  // Per-request nonce for script-src, so inline scripts (React/Next's own
+  // hydration payload — this app has no hand-written inline <script> tags)
+  // can run without 'unsafe-inline'. Next detects the nonce in the CSP
+  // header below and applies it to the scripts it injects automatically.
+  // btoa (not Buffer) because this runs on the Edge runtime.
+  const nonce = btoa(crypto.randomUUID());
+  // Forwarded via a request header so a future Server Component can read it
+  // with headers() and apply it to any hand-written inline <script> — none
+  // exist today, so nothing currently needs to read this.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-nonce", nonce);
+
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -47,10 +59,15 @@ export default auth(async (req) => {
   );
   // CSP — defense-in-depth against XSS. The app renders user-submitted data
   // (company names, tickers) and React 19's JSX auto-escapes by default, but
-  // CSP provides an independent second layer.
+  // CSP provides an independent second layer. script-src is nonce-scoped
+  // (no 'unsafe-inline') so a future injection point couldn't execute an
+  // arbitrary inline script even if one were ever introduced. style-src
+  // stays 'unsafe-inline' — shadcn's chart component renders an inline
+  // <style> tag from internal config (not user input), and style injection
+  // isn't in the same risk class as script injection.
   res.headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'`
   );
   return res;
 });
