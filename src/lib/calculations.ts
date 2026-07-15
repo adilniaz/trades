@@ -87,7 +87,10 @@ export function purifiableGains(txns: Txn[], nonCompliantPct: number): number {
       const runningAvg = shares === 0 ? 0 : cost / shares;
       const sold = t.shares ?? 0;
       const gain = sold * ((t.pricePerShare ?? 0) - runningAvg);
-      if (!t.purifiedAt) purifiable += gain * nonCompliantPct;
+      // Floor at 0: a losing sale must never reduce the purification
+      // obligation from other gains on the same company — only gains ever
+      // add to what must be purified.
+      if (!t.purifiedAt) purifiable += Math.max(0, gain) * nonCompliantPct;
       cost -= sold * runningAvg;
       // Round to 6 decimal places to prevent floating-point error accumulation
       // across many buy/sell cycles (matches Decimal(18,6) DB precision).

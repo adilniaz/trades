@@ -113,6 +113,20 @@ describe("purifiableGains", () => {
     const txns = [buy(10, 5), sell(4, 8, null)];
     expect(purifiableGains(txns, 1)).toBe(12);
   });
+
+  it("floors each sale's contribution at zero, so a loss never offsets gains from other sales", () => {
+    const txns = [
+      buy(10, 10),
+      sell(5, 8, null), // loss: -10
+      buy(10, 10),
+      sell(5, 15, null), // gain: 25
+    ];
+    // Old (netting) behavior would give (-10 + 25) * 0.5 = 7.5.
+    // Floored behavior: (0 + 25) * 0.5 = 12.5.
+    expect(purifiableGains(txns, 0.5)).toBe(12.5);
+    // realizedGains is unaffected — still nets the loss against the gain.
+    expect(realizedGains(txns)).toBe(15);
+  });
 });
 
 describe("breakeven", () => {
