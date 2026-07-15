@@ -38,7 +38,7 @@ describe("requireAuthApi", () => {
     mockAuth.mockResolvedValue({
       user: { id: "1", email: "admin@example.com", role: "ADMIN", tokenVersion: 0 },
     } as SessionLike);
-    mockFindUnique.mockResolvedValue({ active: true, tokenVersion: 0 });
+    mockFindUnique.mockResolvedValue({ active: true, tokenVersion: 0, role: "ADMIN" });
     const result = await requireAuthApi({ roles: ["ADMIN"] });
     expect("error" in result).toBe(false);
     if (!("error" in result)) expect(result.role).toBe("ADMIN");
@@ -48,9 +48,29 @@ describe("requireAuthApi", () => {
     mockAuth.mockResolvedValue({
       user: { id: "1", email: "user@example.com", role: "USER", tokenVersion: 0 },
     } as SessionLike);
-    mockFindUnique.mockResolvedValue({ active: true, tokenVersion: 0 });
+    mockFindUnique.mockResolvedValue({ active: true, tokenVersion: 0, role: "USER" });
     const result = await requireAuthApi();
     expect("error" in result).toBe(false);
+  });
+
+  it("uses the DB role, not a stale/wrong session role, to grant access", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: "1", email: "user@example.com", role: "USER", tokenVersion: 0 },
+    } as SessionLike);
+    mockFindUnique.mockResolvedValue({ active: true, tokenVersion: 0, role: "ADMIN" });
+    const result = await requireAuthApi({ roles: ["ADMIN"] });
+    expect("error" in result).toBe(false);
+    if (!("error" in result)) expect(result.role).toBe("ADMIN");
+  });
+
+  it("uses the DB role, not a stale session role, to deny access", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: "1", email: "admin@example.com", role: "ADMIN", tokenVersion: 0 },
+    } as SessionLike);
+    mockFindUnique.mockResolvedValue({ active: true, tokenVersion: 0, role: "USER" });
+    const result = await requireAuthApi({ roles: ["ADMIN"] });
+    expect("error" in result).toBe(true);
+    if ("error" in result) expect(result.error.status).toBe(403);
   });
 
   it("returns 401 when user is deactivated", async () => {

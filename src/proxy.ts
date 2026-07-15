@@ -19,7 +19,7 @@ export default auth(async (req) => {
   if (session?.user) {
     const dbUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { active: true, tokenVersion: true },
+      select: { active: true, tokenVersion: true, role: true },
     });
     if (!dbUser || !dbUser.active || dbUser.tokenVersion !== session.user.tokenVersion) {
       const res = NextResponse.redirect(new URL("/login", req.url));
@@ -29,7 +29,9 @@ export default auth(async (req) => {
       return res;
     }
 
-    if (pathname.startsWith("/admin") && session.user.role !== "ADMIN") {
+    // Sourced from the DB re-check above, not the JWT's session.user.role —
+    // matches auth-guard.ts's requireAuth/requireAuthApi.
+    if (pathname.startsWith("/admin") && dbUser.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/overview", req.url));
     }
   }
