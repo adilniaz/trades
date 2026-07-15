@@ -42,3 +42,4 @@ yarn-error.log*
 next-env.d.ts
 
 _docs
+VALIDATION_TEST.md
