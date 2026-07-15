@@ -20,4 +20,7 @@ for i in 1 2 3 4 5; do
 done
 $ok || { echo "ERROR: All 5 migration attempts failed."; exit 1; }
 
+echo "Seeding settings..."
+npx prisma db seed
+
 exec "$@"
