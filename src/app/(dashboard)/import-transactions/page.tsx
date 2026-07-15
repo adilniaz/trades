@@ -48,24 +48,30 @@ export default function ImportTransactionsPage() {
             <CardTitle>Results</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-sm">
-              Created: <span className="font-semibold text-green-600">{result.created}</span>
-            </p>
-            {result.skipped.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-red-600">
-                  Skipped ({result.skipped.length}):
+            {result.error ? (
+              <p className="text-sm text-red-600">{result.error}</p>
+            ) : (
+              <>
+                <p className="text-sm">
+                  Created: <span className="font-semibold text-green-600">{result.created}</span>
                 </p>
-                <ul className="text-xs text-muted-foreground space-y-0.5 max-h-48 overflow-y-auto">
-                  {result.skipped.map((s, i) => (
-                    <li key={i}>
-                      <code className="text-xs bg-muted px-1 rounded">{s.line}</code>
-                      {" — "}
-                      {s.reason}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                {result.skipped.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-red-600">
+                      Skipped ({result.skipped.length}):
+                    </p>
+                    <ul className="text-xs text-muted-foreground space-y-0.5 max-h-48 overflow-y-auto">
+                      {result.skipped.map((s, i) => (
+                        <li key={i}>
+                          <code className="text-xs bg-muted px-1 rounded">{s.line}</code>
+                          {" — "}
+                          {s.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

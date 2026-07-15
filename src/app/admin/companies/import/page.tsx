@@ -26,7 +26,11 @@ export default function BulkImportPage() {
     setResult(null);
     try {
       const res = await bulkImportCompanies(csvText);
-      setResult(res);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setResult(res);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Import failed");
     } finally {

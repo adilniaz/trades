@@ -5,6 +5,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { companySchema } from "@/lib/validation/company";
+import { checkImportSize } from "@/lib/import-limits";
+import { activeCompanyWhere, activeTransactionWhere } from "@/lib/prisma-where";
 
 // ---------------------------------------------------------------------------
 // Create
@@ -108,7 +110,7 @@ export async function updateCompany(companyId: string, formData: FormData) {
   try {
     await prisma.$transaction(async (tx) => {
       const updated = await tx.company.update({
-        where: { id: companyId, deletedAt: null },
+        where: activeCompanyWhere({ id: companyId }),
         data: {
           name,
           ticker,
@@ -159,7 +161,7 @@ export async function deleteCompany(companyId: string, force = false) {
     where: { id: companyId },
     include: {
       transactions: {
-        where: { deletedAt: null },
+        where: activeTransactionWhere(),
       },
     },
   });
@@ -182,7 +184,7 @@ export async function deleteCompany(companyId: string, force = false) {
 
   await prisma.$transaction(async (tx) => {
     await tx.company.update({
-      where: { id: companyId, deletedAt: null },
+      where: activeCompanyWhere({ id: companyId }),
       data: { deletedAt: new Date() },
     });
     await tx.auditLog.create({
@@ -240,7 +242,7 @@ export async function approveCompanyRequest(requestId: string, formData: FormDat
   try {
     await prisma.$transaction(async (tx) => {
       const updated = await tx.company.update({
-        where: { id: requestId, status: "PENDING", deletedAt: null },
+        where: activeCompanyWhere({ id: requestId, status: "PENDING" }),
         data: {
           name,
           ticker,
@@ -290,7 +292,7 @@ export async function rejectCompanyRequest(requestId: string) {
   const admin = await requireAuth({ roles: ["ADMIN"] });
 
   const pending = await prisma.company.findFirst({
-    where: { id: requestId, status: "PENDING", deletedAt: null },
+    where: activeCompanyWhere({ id: requestId, status: "PENDING" }),
   });
   if (!pending) return { error: "Company request not found or already processed" };
 
@@ -332,6 +334,7 @@ export async function rejectCompanyRequest(requestId: string) {
 type ImportResult = {
   created: number;
   skipped: { row: number; reason: string }[];
+  error?: string;
 };
 
 export async function bulkImportCompanies(csvText: string): Promise<ImportResult> {
@@ -342,6 +345,9 @@ export async function bulkImportCompanies(csvText: string): Promise<ImportResult
   const hasHeader = lines.length > 0 &&
     /^name[,\s]|^"name"|^,?name/i.test(lines[0].trim());
   const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  const sizeError = checkImportSize(csvText, dataLines.length);
+  if (sizeError) return { created: 0, skipped: [], error: sizeError };
 
   for (let i = 0; i < dataLines.length; i++) {
     const rowNum = hasHeader ? i + 2 : i + 1;
@@ -370,7 +376,7 @@ export async function bulkImportCompanies(csvText: string): Promise<ImportResult
     // partial unique index (WHERE "deletedAt" IS NULL, see schema.prisma),
     // so no mangling/recycling workaround is needed here.
     const existing = await prisma.company.findFirst({
-      where: { ticker, deletedAt: null },
+      where: activeCompanyWhere({ ticker }),
     });
     if (existing) {
       result.skipped.push({ row: rowNum, reason: `Ticker ${ticker} already exists` });

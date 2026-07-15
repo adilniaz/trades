@@ -5,10 +5,13 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { transactionSchema } from "@/lib/validation/transaction";
+import { checkImportSize } from "@/lib/import-limits";
+import { activeCompanyWhere } from "@/lib/prisma-where";
 
 export type ImportResult = {
   created: number;
   skipped: { line: string; reason: string }[];
+  error?: string;
 };
 
 export async function bulkImportTransactions(
@@ -30,6 +33,9 @@ export async function bulkImportTransactions(
   if (!header.includes("date") || !header.includes("ticker") || !header.includes("type")) {
     return { created: 0, skipped: [{ line: lines[0], reason: "Invalid header" }] };
   }
+
+  const sizeError = checkImportSize(csvText, lines.length - 1);
+  if (sizeError) return { created: 0, skipped: [], error: sizeError };
 
   const skipped: { line: string; reason: string }[] = [];
   let created = 0;
@@ -62,7 +68,7 @@ export async function bulkImportTransactions(
     const { type: txnType, date, shares, pricePerShare, amount } = parsed.data;
 
     const company = await prisma.company.findFirst({
-      where: { ticker: ticker.toUpperCase(), deletedAt: null },
+      where: activeCompanyWhere({ ticker: ticker.toUpperCase() }),
     });
 
     if (!company || company.status !== "APPROVED") {
