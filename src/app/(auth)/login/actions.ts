@@ -1,19 +1,11 @@
 "use server";
 
-import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { loginSchema } from "@/lib/validation/auth";
 import { logger } from "@/lib/logger";
 import { isIpThrottled, recordFailedAttempt } from "@/lib/ip-rate-limit";
-
-async function getClientIp(): Promise<string> {
-  const h = await headers();
-  // First entry is the original client per the standard convention; falls
-  // back to a shared bucket if the header is absent (e.g. proxy misconfig)
-  // rather than throwing.
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-}
+import { getClientIp } from "@/lib/get-client-ip";
 
 export async function loginAction(
   _prevState: { error?: string } | undefined,
