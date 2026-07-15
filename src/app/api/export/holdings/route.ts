@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { toCsv } from "@/lib/export-utils";
 import { computeHoldings } from "@/lib/holdings";
+import { activeCompanyWhere, activeTransactionWhere } from "@/lib/prisma-where";
 
 export async function GET() {
   const result = await requireAuthApi();
@@ -12,10 +13,10 @@ export async function GET() {
   const settings = await getSettings();
 
   const companies = await prisma.company.findMany({
-    where: { status: "APPROVED", deletedAt: null },
+    where: activeCompanyWhere({ status: "APPROVED" as const }),
     include: {
       transactions: {
-        where: { userId: result.id, deletedAt: null },
+        where: activeTransactionWhere({ userId: result.id }),
         orderBy: { date: "asc" },
       },
     },

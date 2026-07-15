@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { requireAuthApi } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { toCsv } from "@/lib/export-utils";
+import { activeTransactionWhere } from "@/lib/prisma-where";
 
 export async function GET() {
   const result = await requireAuthApi();
   if ("error" in result) return result.error;
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId: result.id, deletedAt: null },
+    where: activeTransactionWhere({ userId: result.id }),
     include: { company: { select: { name: true, ticker: true } } },
     orderBy: { date: "asc" },
   });

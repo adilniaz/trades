@@ -6,6 +6,7 @@ import {
   purifiableDividends,
 } from "@/lib/calculations";
 import { toTxn } from "@/lib/to-txn";
+import { activeTransactionWhere } from "@/lib/prisma-where";
 import { TransactionForm } from "@/components/transactions/transaction-form";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { MarkPurifiedButton } from "@/components/transactions/mark-purified-button";
@@ -27,7 +28,7 @@ export default async function CompanyDetailPage({
   }
 
   const transactions = await prisma.transaction.findMany({
-    where: { companyId: id, userId: user.id, deletedAt: null },
+    where: activeTransactionWhere({ companyId: id, userId: user.id }),
     orderBy: { date: "asc" },
   });
 

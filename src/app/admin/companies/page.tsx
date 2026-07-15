@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
+import { activeCompanyWhere } from "@/lib/prisma-where";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -23,13 +24,12 @@ export default async function AdminCompaniesPage({
   const pageSize = Math.min(100, Math.max(1, Number(sp.pageSize) || DEFAULT_PAGE_SIZE));
   const query = sp.q?.trim() || "";
 
-  const approvedWhere = {
+  const approvedWhere = activeCompanyWhere({
     status: "APPROVED" as const,
-    deletedAt: null,
     ...(query
       ? { OR: [{ name: { contains: query } }, { ticker: { contains: query } }] }
       : {}),
-  };
+  });
 
   const [approved, approvedTotal, pending] = await Promise.all([
     prisma.company.findMany({
@@ -40,7 +40,7 @@ export default async function AdminCompaniesPage({
     }),
     prisma.company.count({ where: approvedWhere }),
     prisma.company.findMany({
-      where: { status: "PENDING", deletedAt: null },
+      where: activeCompanyWhere({ status: "PENDING" as const }),
       include: { requestedBy: { select: { email: true } } },
       orderBy: { createdAt: "desc" },
     }),

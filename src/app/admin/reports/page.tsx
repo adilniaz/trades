@@ -8,6 +8,7 @@ import {
   type Txn,
 } from "@/lib/calculations";
 import { toTxn } from "@/lib/to-txn";
+import { activeCompanyWhere, activeTransactionWhere } from "@/lib/prisma-where";
 import {
   Table,
   TableHeader,
@@ -46,10 +47,10 @@ export default async function AdminReportsPage() {
   const settings = await getSettings();
 
   const companies = await prisma.company.findMany({
-    where: { status: "APPROVED", deletedAt: null },
+    where: activeCompanyWhere({ status: "APPROVED" as const }),
     include: {
       transactions: {
-        where: { deletedAt: null },
+        where: activeTransactionWhere(),
         include: { user: { select: { id: true, email: true } } },
         orderBy: { date: "asc" },
       },

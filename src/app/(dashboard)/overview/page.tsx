@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/auth-guard";
 import { getSettings } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { computeHoldings } from "@/lib/holdings";
+import { activeCompanyWhere, activeTransactionWhere } from "@/lib/prisma-where";
 import { HoldingsTable } from "@/components/holdings/holdings-table";
 import { PurificationChart } from "@/components/holdings/purification-chart";
 
@@ -10,10 +11,10 @@ export default async function OverviewPage() {
   const settings = await getSettings();
 
   const companies = await prisma.company.findMany({
-    where: { status: "APPROVED", deletedAt: null },
+    where: activeCompanyWhere({ status: "APPROVED" as const }),
     include: {
       transactions: {
-        where: { userId: user.id, deletedAt: null },
+        where: activeTransactionWhere({ userId: user.id }),
         orderBy: { date: "asc" },
       },
     },

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
+import { activeCompanyWhere } from "@/lib/prisma-where";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
@@ -8,7 +9,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let pendingCount: number | undefined;
   if (user.role === "ADMIN") {
     pendingCount = await prisma.company.count({
-      where: { status: "PENDING", deletedAt: null },
+      where: activeCompanyWhere({ status: "PENDING" as const }),
     });
   }
 
