@@ -2,6 +2,13 @@
 set -e
 
 : "${AUTH_SECRET:?AUTH_SECRET must be set}"
+
+if [ "$AUTH_SECRET" = "generate-with-npx-auth-secret" ]; then
+  echo "ERROR: AUTH_SECRET is using the default placeholder."
+  echo "Generate a real secret: openssl rand -base64 32"
+  exit 1
+fi
+
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 
 echo "Running database migrations..."

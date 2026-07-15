@@ -8,12 +8,19 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "format": "prettier --write src/ tests/",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:seed": "tsx prisma/seed.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "prettier": {
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "all",
+    "tabWidth": 2
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -30,6 +37,7 @@
     "next-themes": "^0.4.6",
     "pg": "^8.22.0",
     "pino": "^10.3.1",
+    "prettier": "^3.3.3",
     "react": "19.2.4",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.4",
