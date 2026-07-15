@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
+import { position } from "@/lib/calculations";
+import { toTxn } from "@/lib/to-txn";
+import { activeTransactionWhere } from "@/lib/prisma-where";
 import {
   transactionSchema,
   type TransactionInput,
@@ -17,6 +20,24 @@ function normalizeTransactionFields(data: TransactionInput) {
     return { ...data, shares: undefined, pricePerShare: undefined };
   }
   return { ...data, amount: undefined };
+}
+
+// Current share count for this user/company, optionally excluding one
+// transaction (used when editing an existing SELL, so it isn't checked
+// against a position total that still includes its own prior shares).
+async function getLivePosition(
+  companyId: string,
+  userId: string,
+  excludeTransactionId?: string
+): Promise<number> {
+  const rows = await prisma.transaction.findMany({
+    where: activeTransactionWhere({
+      companyId,
+      userId,
+      ...(excludeTransactionId ? { id: { not: excludeTransactionId } } : {}),
+    }),
+  });
+  return position(rows.map(toTxn));
 }
 
 // ---------------------------------------------------------------------------
@@ -43,6 +64,17 @@ export async function addTransaction(
   }
 
   const normalized = normalizeTransactionFields(parsed.data);
+
+  if (normalized.type === "SELL") {
+    const currentPosition = await getLivePosition(companyId, user.id);
+    if ((normalized.shares ?? 0) > currentPosition) {
+      return {
+        error: {
+          shares: [`Cannot sell ${normalized.shares} shares — only ${currentPosition} currently held`],
+        },
+      };
+    }
+  }
 
   await prisma.transaction.create({
     data: {
@@ -79,8 +111,19 @@ export async function updateTransaction(
 
   const normalized = normalizeTransactionFields(parsed.data);
 
+  if (normalized.type === "SELL") {
+    const currentPosition = await getLivePosition(companyId, user.id, id);
+    if ((normalized.shares ?? 0) > currentPosition) {
+      return {
+        error: {
+          shares: [`Cannot sell ${normalized.shares} shares — only ${currentPosition} currently held`],
+        },
+      };
+    }
+  }
+
   const result = await prisma.transaction.updateMany({
-    where: { id, userId: user.id, deletedAt: null },
+    where: activeTransactionWhere({ id, userId: user.id }),
     data: {
       type: normalized.type as "BUY" | "SELL" | "DIVIDEND",
       date: normalized.date,
@@ -107,7 +150,7 @@ export async function deleteTransaction(id: string, companyId: string) {
   const user = await requireAuth();
 
   const result = await prisma.transaction.updateMany({
-    where: { id, userId: user.id, deletedAt: null },
+    where: activeTransactionWhere({ id, userId: user.id }),
     data: { deletedAt: new Date() },
   });
 
@@ -127,7 +170,7 @@ export async function deleteTransaction(id: string, companyId: string) {
 export async function markPurified(companyId: string) {
   const user = await requireAuth();
   await prisma.transaction.updateMany({
-    where: { companyId, userId: user.id, deletedAt: null, purifiedAt: null },
+    where: activeTransactionWhere({ companyId, userId: user.id, purifiedAt: null }),
     data: { purifiedAt: new Date() },
   });
   revalidatePath(`/companies/${companyId}`);
