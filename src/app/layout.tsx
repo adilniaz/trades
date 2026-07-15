@@ -1,22 +1,30 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { Toaster } from "sonner";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { IBM_Plex_Serif, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { ThemeProvider } from 'next-themes';
+import { Toaster } from 'sonner';
+import './globals.css';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const plexSerif = IBM_Plex_Serif({
+  variable: '--font-plex-serif',
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const plexSans = IBM_Plex_Sans({
+  variable: '--font-plex-sans',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+});
+
+const plexMono = IBM_Plex_Mono({
+  variable: '--font-plex-mono',
+  subsets: ['latin'],
+  weight: ['400', '500'],
 });
 
 export const metadata: Metadata = {
-  title: "Trades Tracker",
-  description: "Shariah-compliant stock portfolio purification tracker",
+  title: 'Trades Tracker',
+  description: 'Shariah-compliant stock portfolio purification tracker',
 };
 
 export default function RootLayout({
@@ -27,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${plexSerif.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { deleteCompany } from "@/app/admin/companies/actions";
+import { deleteCompany } from "@/app/(dashboard)/admin/companies/actions";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PasswordStrengthMeter } from "@/components/ui/password-strength";
-import { setUserActive, resetUserPassword } from "@/app/admin/users/actions";
+import { setUserActive, resetUserPassword } from "@/app/(dashboard)/admin/users/actions";
 
 type Props = {
   userId: string;

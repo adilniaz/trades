@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { approveCompanyRequest, rejectCompanyRequest } from "@/app/admin/companies/actions";
+import { approveCompanyRequest, rejectCompanyRequest } from "@/app/(dashboard)/admin/companies/actions";
 import { Button } from "@/components/ui/button";
 import { CompanyForm } from "./company-form";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";

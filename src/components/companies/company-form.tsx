@@ -90,7 +90,7 @@ export function CompanyForm({
       <div className="space-y-2">
         <Label htmlFor="name">Name</Label>
         <Input id="name" {...register("name")} disabled={disabledFields?.includes("name")} />
-        {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
       </div>
 
       <div className="space-y-2">
@@ -103,7 +103,7 @@ export function CompanyForm({
             e.target.value = e.target.value.toUpperCase();
           }}
         />
-        {errors.ticker && <p className="text-sm text-red-600">{errors.ticker.message}</p>}
+        {errors.ticker && <p className="text-sm text-destructive">{errors.ticker.message}</p>}
       </div>
 
       <div className="space-y-2">
@@ -115,7 +115,7 @@ export function CompanyForm({
           {...register("nonCompliantPct", { valueAsNumber: true })}
         />
         {errors.nonCompliantPct && (
-          <p className="text-sm text-red-600">{errors.nonCompliantPct.message}</p>
+          <p className="text-sm text-destructive">{errors.nonCompliantPct.message}</p>
         )}
       </div>
 
@@ -123,7 +123,7 @@ export function CompanyForm({
         <Label htmlFor="dividendPeriod">Dividend period</Label>
         <Input id="dividendPeriod" {...register("dividendPeriod")} />
         {errors.dividendPeriod && (
-          <p className="text-sm text-red-600">{errors.dividendPeriod.message}</p>
+          <p className="text-sm text-destructive">{errors.dividendPeriod.message}</p>
         )}
       </div>
 
@@ -131,11 +131,11 @@ export function CompanyForm({
         <Label htmlFor="nextDividendDate">Next dividend date</Label>
         <Input id="nextDividendDate" type="date" {...register("nextDividendDate")} />
         {errors.nextDividendDate && (
-          <p className="text-sm text-red-600">{errors.nextDividendDate.message}</p>
+          <p className="text-sm text-destructive">{errors.nextDividendDate.message}</p>
         )}
       </div>
 
-      {errors.root && <p className="text-sm text-red-600">{errors.root.message}</p>}
+      {errors.root && <p className="text-sm text-destructive">{errors.root.message}</p>}
 
       <Button type="submit" disabled={disabled || isSubmitting}>
         {isSubmitting ? "Saving…" : submitLabel}

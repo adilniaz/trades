@@ -1,14 +1,14 @@
-import { requireAuth } from "@/lib/auth-guard";
-import { prisma } from "@/lib/prisma";
-import { getSettings } from "@/lib/settings";
+import { requireAuth } from '@/lib/auth-guard';
+import { prisma } from '@/lib/prisma';
+import { getSettings } from '@/lib/settings';
 import {
   position,
   purifiableGains,
   purifiableDividends,
   type Txn,
-} from "@/lib/calculations";
-import { toTxn } from "@/lib/to-txn";
-import { activeCompanyWhere, activeTransactionWhere } from "@/lib/prisma-where";
+} from '@/lib/calculations';
+import { toTxn } from '@/lib/to-txn';
+import { activeCompanyWhere, activeTransactionWhere } from '@/lib/prisma-where';
 import {
   Table,
   TableHeader,
@@ -16,8 +16,9 @@ import {
   TableHead,
   TableRow,
   TableCell,
-} from "@/components/ui/table";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+} from '@/components/ui/table';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { PageHeading } from '@/components/layout/page-heading';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -43,16 +44,16 @@ type UserBlock = {
 // ---------------------------------------------------------------------------
 
 export default async function AdminReportsPage() {
-  await requireAuth({ roles: ["ADMIN"] });
+  await requireAuth({ roles: ['ADMIN'] });
   const settings = await getSettings();
 
   const companies = await prisma.company.findMany({
-    where: activeCompanyWhere({ status: "APPROVED" as const }),
+    where: activeCompanyWhere({ status: 'APPROVED' as const }),
     include: {
       transactions: {
         where: activeTransactionWhere(),
         include: { user: { select: { id: true, email: true } } },
-        orderBy: { date: "asc" },
+        orderBy: { date: 'asc' },
       },
     },
     // Safety cap: this is the one query in the app that grows with total
@@ -127,8 +128,8 @@ export default async function AdminReportsPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
-      <h1 className="text-2xl font-semibold">Cross-User Reports</h1>
+    <div className="space-y-8">
+      <PageHeading>Cross-user reports</PageHeading>
 
       {userBlocks.map(({ email, rows, userGains, userDividends }, idx) => (
         <Card key={idx}>
@@ -140,25 +141,30 @@ export default async function AdminReportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Ticker</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Non-compliant %</TableHead>
-                  <TableHead>Purifiable Gains</TableHead>
-                  <TableHead>Purifiable Dividends</TableHead>
+                  <TableHead className="text-right">Position</TableHead>
+                  <TableHead className="text-right">Non-compliant %</TableHead>
+                  <TableHead className="text-right">Purifiable gains</TableHead>
+                  <TableHead className="text-right">
+                    Purifiable dividends
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row, rIdx) => (
                   <TableRow key={rIdx}>
                     <TableCell className="font-medium">{row.ticker}</TableCell>
-                    <TableCell>{row.shares}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {row.shares}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
                       {(row.nonCompliantPct * 100).toFixed(2)}%
                     </TableCell>
-                    <TableCell>
-                      {row.purifiableGains.toFixed(2)} {settings.displayCurrency}
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {row.purifiableGains.toFixed(2)}{' '}
+                      {settings.displayCurrency}
                     </TableCell>
-                    <TableCell>
-                      {row.purifiableDividends.toFixed(2)}{" "}
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {row.purifiableDividends.toFixed(2)}{' '}
                       {settings.displayCurrency}
                     </TableCell>
                   </TableRow>
@@ -167,19 +173,29 @@ export default async function AdminReportsPage() {
             </Table>
 
             <p className="mt-3 text-sm font-medium">
-              User totals: {userGains.toFixed(2)} {settings.displayCurrency}{" "}
-              gains &middot; {userDividends.toFixed(2)}{" "}
-              {settings.displayCurrency} dividends
+              User totals:{' '}
+              <span className="font-mono tabular-nums">
+                {userGains.toFixed(2)} {settings.displayCurrency}
+              </span>{' '}
+              gains &middot;{' '}
+              <span className="font-mono tabular-nums">
+                {userDividends.toFixed(2)} {settings.displayCurrency}
+              </span>{' '}
+              dividends
             </p>
           </CardContent>
         </Card>
       ))}
 
-      <div className="rounded-lg border p-4 text-right text-lg font-semibold">
-        Grand totals: {grandGains.toFixed(2)} {settings.displayCurrency} gains
-        &middot; {grandDividends.toFixed(2)} {settings.displayCurrency}{" "}
-        dividends
-      </div>
+      <Card>
+        <CardContent className="text-right">
+          <div className="text-sm text-muted-foreground">Grand totals</div>
+          <div className="font-heading text-lg font-semibold tabular-nums">
+            {grandGains.toFixed(2)} {settings.displayCurrency} gains &middot;{' '}
+            {grandDividends.toFixed(2)} {settings.displayCurrency} dividends
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

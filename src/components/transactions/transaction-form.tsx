@@ -168,7 +168,7 @@ export function TransactionForm({ companyId, editing, onDone }: Props) {
           <option value="DIVIDEND">DIVIDEND</option>
         </select>
         {errors.type && (
-          <p className="text-sm text-red-600">{errors.type.message}</p>
+          <p className="text-sm text-destructive">{errors.type.message}</p>
         )}
       </div>
 
@@ -176,7 +176,7 @@ export function TransactionForm({ companyId, editing, onDone }: Props) {
         <Label htmlFor="date">Date</Label>
         <Input id="date" type="date" {...register("date")} />
         {errors.date && (
-          <p className="text-sm text-red-600">{errors.date.message}</p>
+          <p className="text-sm text-destructive">{errors.date.message}</p>
         )}
       </div>
 
@@ -191,7 +191,7 @@ export function TransactionForm({ companyId, editing, onDone }: Props) {
               {...register("shares")}
             />
             {errors.shares && (
-              <p className="text-sm text-red-600">{errors.shares.message}</p>
+              <p className="text-sm text-destructive">{errors.shares.message}</p>
             )}
           </div>
 
@@ -204,7 +204,7 @@ export function TransactionForm({ companyId, editing, onDone }: Props) {
               {...register("pricePerShare")}
             />
             {errors.pricePerShare && (
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-destructive">
                 {errors.pricePerShare.message}
               </p>
             )}
@@ -222,13 +222,13 @@ export function TransactionForm({ companyId, editing, onDone }: Props) {
             {...register("amount")}
           />
           {errors.amount && (
-            <p className="text-sm text-red-600">{errors.amount.message}</p>
+            <p className="text-sm text-destructive">{errors.amount.message}</p>
           )}
         </div>
       )}
 
       {errors.root && (
-        <p className="text-sm text-red-600">{errors.root.message}</p>
+        <p className="text-sm text-destructive">{errors.root.message}</p>
       )}
 
       <div className="flex gap-2">

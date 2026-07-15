@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { updateTransactionFee } from "@/app/admin/settings/actions";
+import { updateTransactionFee } from "@/app/(dashboard)/admin/settings/actions";
 
 type Props = {
   currentFee: number;
@@ -60,7 +60,7 @@ export function SettingsForm({ currentFee }: Props) {
           {isPending ? "Saving…" : "Save"}
         </Button>
         {message && (
-          <p className={`text-sm ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
+          <p className={`text-sm ${message.type === "success" ? "text-primary" : "text-destructive"}`}>
             {message.text}
           </p>
         )}

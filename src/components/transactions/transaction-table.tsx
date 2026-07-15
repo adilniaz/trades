@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -10,14 +10,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import {
   TransactionForm,
   type Transaction,
-} from "@/components/transactions/transaction-form";
-import { deleteTransaction } from "@/app/(dashboard)/companies/[id]/actions";
+} from '@/components/transactions/transaction-form';
+import { deleteTransaction } from '@/app/(dashboard)/companies/[id]/actions';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,10 +29,10 @@ import { deleteTransaction } from "@/app/(dashboard)/companies/[id]/actions";
  * occurs when `new Date("YYYY-MM-DD")` is converted to local time.
  */
 function formatUtcDate(d: Date | string): string {
-  const date = typeof d === "string" ? new Date(d) : d;
+  const date = typeof d === 'string' ? new Date(d) : d;
   const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
@@ -97,18 +97,20 @@ export function TransactionTable({ companyId, transactions }: Props) {
 
             return (
               <TableRow key={txn.id}>
-                <TableCell>{formatUtcDate(txn.date)}</TableCell>
+                <TableCell className="font-mono tabular-nums">
+                  {formatUtcDate(txn.date)}
+                </TableCell>
                 <TableCell>{txn.type}</TableCell>
-                <TableCell className="text-right">
-                  {txn.shares !== null ? txn.shares : "—"}
+                <TableCell className="text-right font-mono tabular-nums">
+                  {txn.shares !== null ? txn.shares : '—'}
                 </TableCell>
-                <TableCell className="text-right">
-                  {txn.pricePerShare !== null ? txn.pricePerShare : "—"}
+                <TableCell className="text-right font-mono tabular-nums">
+                  {txn.pricePerShare !== null ? txn.pricePerShare : '—'}
                 </TableCell>
-                <TableCell className="text-right">
-                  {txn.amount !== null ? txn.amount : "—"}
+                <TableCell className="text-right font-mono tabular-nums">
+                  {txn.amount !== null ? txn.amount : '—'}
                 </TableCell>
-                <TableCell>{txn.purifiedAt ? "Yes" : "No"}</TableCell>
+                <TableCell>{txn.purifiedAt ? 'Yes' : 'No'}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     <Button
@@ -126,16 +128,23 @@ export function TransactionTable({ companyId, transactions }: Props) {
                       onConfirm={() =>
                         new Promise<void>((resolve) => {
                           startTransition(async () => {
-                            const result = await deleteTransaction(txn.id, companyId);
+                            const result = await deleteTransaction(
+                              txn.id,
+                              companyId,
+                            );
                             if (result.error) toast.error(String(result.error));
-                            else toast.success("Transaction deleted");
+                            else toast.success('Transaction deleted');
                             router.refresh();
                             resolve();
                           });
                         })
                       }
                     >
-                      <Button size="xs" variant="destructive" disabled={isPending}>
+                      <Button
+                        size="xs"
+                        variant="destructive"
+                        disabled={isPending}
+                      >
                         Delete
                       </Button>
                     </ConfirmationDialog>

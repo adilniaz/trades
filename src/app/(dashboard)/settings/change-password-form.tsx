@@ -1,14 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { changePasswordSchema, type ChangePasswordInput } from "@/lib/validation/settings";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { PasswordStrengthMeter } from "@/components/ui/password-strength";
-import { changePassword } from "./actions";
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  changePasswordSchema,
+  type ChangePasswordInput,
+} from '@/lib/validation/settings';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { PasswordStrengthMeter } from '@/components/ui/password-strength';
+import { changePassword } from './actions';
 
 export function ChangePasswordForm() {
   const {
@@ -19,13 +22,13 @@ export function ChangePasswordForm() {
     reset,
   } = useForm<ChangePasswordInput>({
     resolver: zodResolver(changePasswordSchema),
-    defaultValues: { currentPassword: "", newPassword: "" },
+    defaultValues: { currentPassword: '', newPassword: '' },
   });
 
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const newPasswordValue = watch("newPassword");
+  const newPasswordValue = watch('newPassword');
 
   const submit = async (data: ChangePasswordInput) => {
     setServerError(null);
@@ -35,35 +38,44 @@ export function ChangePasswordForm() {
       setSuccess(true);
       reset();
     } catch (e) {
-      setServerError(e instanceof Error ? e.message : "Something went wrong");
+      setServerError(e instanceof Error ? e.message : 'Something went wrong');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="space-y-4 max-w-sm">
-      <h2 className="text-sm font-medium">Change password</h2>
+    <form onSubmit={handleSubmit(submit)} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="currentPassword">Current password</Label>
-        <Input id="currentPassword" type="password" {...register("currentPassword")} />
+        <Input
+          id="currentPassword"
+          type="password"
+          {...register('currentPassword')}
+        />
         {errors.currentPassword && (
-          <p className="text-sm text-red-600">{errors.currentPassword.message}</p>
+          <p className="text-sm text-destructive">
+            {errors.currentPassword.message}
+          </p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="newPassword">New password</Label>
-        <Input id="newPassword" type="password" {...register("newPassword")} />
+        <Input id="newPassword" type="password" {...register('newPassword')} />
         {errors.newPassword && (
-          <p className="text-sm text-red-600">{errors.newPassword.message}</p>
+          <p className="text-sm text-destructive">
+            {errors.newPassword.message}
+          </p>
         )}
         <PasswordStrengthMeter password={newPasswordValue} />
       </div>
 
-      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
-      {success && <p className="text-sm text-green-600">Password changed successfully.</p>}
+      {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+      {success && (
+        <p className="text-sm text-primary">Password changed successfully.</p>
+      )}
 
       <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Saving…" : "Change password"}
+        {isSubmitting ? 'Saving…' : 'Change password'}
       </Button>
     </form>
   );
