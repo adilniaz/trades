@@ -67,9 +67,10 @@ export default auth(async (req) => {
   // stays 'unsafe-inline' — shadcn's chart component renders an inline
   // <style> tag from internal config (not user input), and style injection
   // isn't in the same risk class as script injection.
+  const cspEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
   res.headers.set(
     "Content-Security-Policy",
-    `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'`
+    `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${cspEval}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'`
   );
   return res;
 });

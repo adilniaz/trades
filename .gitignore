@@ -37,6 +37,9 @@ yarn-error.log*
 !.env.example
 !.env.test.example
 
+# Infisical project config (safe to commit — no secrets)
+!.infisical.json
+
 # vercel
 .vercel
 

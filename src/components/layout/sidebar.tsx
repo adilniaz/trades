@@ -91,9 +91,7 @@ export function Sidebar({
       {/* Mobile header + sheet */}
       <div className="lg:hidden flex items-center p-4 border-b">
         <Sheet>
-          <SheetTrigger>
-            <Button variant="outline" size="sm" type="button">☰</Button>
-          </SheetTrigger>
+          <SheetTrigger render={<Button variant="outline" size="sm" type="button" />}>☰</SheetTrigger>
           <SheetContent side="left" className="w-56 p-4 text-sm">
             <div className="flex flex-col h-full">
               <div className="flex-1">

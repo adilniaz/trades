@@ -24,8 +24,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/.infisical.json ./.infisical.json
 COPY scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
+RUN npm install -g @infisical/cli
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
@@ -39,9 +41,10 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
+RUN npm install -g @infisical/cli
 COPY . .
+RUN npx prisma generate
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-ENV SKIP_ADMIN_SEED=true
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["npx", "next", "dev"]
