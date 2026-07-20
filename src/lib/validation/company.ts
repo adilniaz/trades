@@ -3,6 +3,7 @@ import { z } from "zod";
 export const companySchema = z.object({
   name: z.string().min(1, "Name is required"),
   ticker: z.string().min(1, "Ticker is required").toUpperCase(),
+  isin: z.string().optional(),
   nonCompliantPct: z.preprocess(
     (v) => (v === "" || v === undefined ? 0 : Number(v)),
     z.coerce

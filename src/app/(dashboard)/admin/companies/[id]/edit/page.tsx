@@ -20,6 +20,7 @@ export default async function EditCompanyPage({ params }: Props) {
   const initial = {
     name: company.name,
     ticker: company.ticker,
+    isin: company.isin ?? undefined,
     nonCompliantPct: Number(company.nonCompliantPct),
     dividendPeriod: company.dividendPeriod ?? undefined,
     nextDividendDate: company.nextDividendDate

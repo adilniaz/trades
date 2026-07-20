@@ -28,7 +28,7 @@ export async function createCompany(formData: FormData) {
     return { error: parsed.error.flatten().fieldErrors };
   }
 
-  const { name, ticker, nonCompliantPct, dividendPeriod, nextDividendDate } = parsed.data;
+  const { name, ticker, isin, nonCompliantPct, dividendPeriod, nextDividendDate } = parsed.data;
 
   let company;
   try {
@@ -37,6 +37,7 @@ export async function createCompany(formData: FormData) {
         data: {
           name,
           ticker,
+          isin: isin ?? undefined,
           nonCompliantPct,
           dividendPeriod: dividendPeriod ?? undefined,
           nextDividendDate: nextDividendDate ?? undefined,
@@ -53,6 +54,7 @@ export async function createCompany(formData: FormData) {
           after: {
             name,
             ticker,
+            isin: isin ?? null,
             nonCompliantPct: Number(created.nonCompliantPct),
             dividendPeriod: dividendPeriod ?? null,
             nextDividendDate: nextDividendDate ?? null,
@@ -63,7 +65,7 @@ export async function createCompany(formData: FormData) {
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return { error: { ticker: ["A company with this ticker already exists"] } };
+      return { error: { ticker: ["A company with this ticker or ISIN already exists"] } };
     }
     throw e;
   }
@@ -97,11 +99,12 @@ export async function updateCompany(companyId: string, formData: FormData) {
     return { error: parsed.error.flatten().fieldErrors };
   }
 
-  const { name, ticker, nonCompliantPct, dividendPeriod, nextDividendDate } = parsed.data;
+  const { name, ticker, isin, nonCompliantPct, dividendPeriod, nextDividendDate } = parsed.data;
 
   const before = {
     name: existing.name,
     ticker: existing.ticker,
+    isin: existing.isin ?? null,
     nonCompliantPct: Number(existing.nonCompliantPct),
     dividendPeriod: existing.dividendPeriod,
     nextDividendDate: existing.nextDividendDate,
@@ -114,6 +117,7 @@ export async function updateCompany(companyId: string, formData: FormData) {
         data: {
           name,
           ticker,
+          isin: isin ?? undefined,
           nonCompliantPct,
           dividendPeriod: dividendPeriod ?? undefined,
           nextDividendDate: nextDividendDate ?? undefined,
@@ -129,6 +133,7 @@ export async function updateCompany(companyId: string, formData: FormData) {
           after: {
             name,
             ticker,
+            isin: isin ?? null,
             nonCompliantPct: Number(updated.nonCompliantPct),
             dividendPeriod: dividendPeriod ?? null,
             nextDividendDate: nextDividendDate ?? null,
@@ -141,7 +146,7 @@ export async function updateCompany(companyId: string, formData: FormData) {
       return { error: "Company not found" };
     }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return { error: { ticker: ["A company with this ticker already exists"] } };
+      return { error: { ticker: ["A company with this ticker or ISIN already exists"] } };
     }
     throw e;
   }
@@ -228,11 +233,12 @@ export async function approveCompanyRequest(requestId: string, formData: FormDat
     return { error: parsed.error.flatten().fieldErrors };
   }
 
-  const { name, ticker, nonCompliantPct, dividendPeriod, nextDividendDate } = parsed.data;
+  const { name, ticker, isin, nonCompliantPct, dividendPeriod, nextDividendDate } = parsed.data;
 
   const before = {
     name: pending.name,
     ticker: pending.ticker,
+    isin: pending.isin ?? null,
     nonCompliantPct: Number(pending.nonCompliantPct),
     dividendPeriod: pending.dividendPeriod,
     nextDividendDate: pending.nextDividendDate,
@@ -246,6 +252,7 @@ export async function approveCompanyRequest(requestId: string, formData: FormDat
         data: {
           name,
           ticker,
+          isin: isin ?? undefined,
           nonCompliantPct,
           dividendPeriod: dividendPeriod ?? undefined,
           nextDividendDate: nextDividendDate ?? undefined,
@@ -262,6 +269,7 @@ export async function approveCompanyRequest(requestId: string, formData: FormDat
           after: {
             name,
             ticker,
+            isin: isin ?? null,
             nonCompliantPct: Number(updated.nonCompliantPct),
             dividendPeriod: dividendPeriod ?? null,
             nextDividendDate: nextDividendDate ?? null,
@@ -275,7 +283,7 @@ export async function approveCompanyRequest(requestId: string, formData: FormDat
       return { error: "Pending request not found" };
     }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return { error: { ticker: ["A company with this ticker already exists"] } };
+      return { error: { ticker: ["A company with this ticker or ISIN already exists"] } };
     }
     throw e;
   }

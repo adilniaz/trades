@@ -13,6 +13,7 @@ type Props = {
   initial: {
     name: string;
     ticker: string;
+    isin?: string;
     nonCompliantPct: number;
     dividendPeriod?: string;
     nextDividendDate?: Date;
@@ -31,6 +32,7 @@ export function EditCompanyForm({
     const fd = new FormData();
     fd.set('name', data.name);
     fd.set('ticker', data.ticker);
+    if (data.isin) fd.set('isin', data.isin);
     fd.set('nonCompliantPct', String(data.nonCompliantPct));
     if (data.dividendPeriod) fd.set('dividendPeriod', data.dividendPeriod);
     if (data.nextDividendDate)
@@ -45,6 +47,7 @@ export function EditCompanyForm({
   const formInitial = {
     name: initial.name,
     ticker: initial.ticker,
+    isin: initial.isin,
     nonCompliantPct: initial.nonCompliantPct,
     dividendPeriod: initial.dividendPeriod,
     nextDividendDate:

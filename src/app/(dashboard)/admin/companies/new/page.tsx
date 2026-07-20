@@ -15,6 +15,7 @@ export default function NewCompanyPage() {
     const fd = new FormData();
     fd.set('name', data.name);
     fd.set('ticker', data.ticker);
+    if (data.isin) fd.set('isin', data.isin);
     fd.set('nonCompliantPct', String(data.nonCompliantPct));
     if (data.dividendPeriod) fd.set('dividendPeriod', data.dividendPeriod);
     if (data.nextDividendDate)

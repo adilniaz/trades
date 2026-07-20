@@ -18,6 +18,7 @@ export async function requestCompany(input: unknown) {
       data: {
         name: data.name,
         ticker: data.ticker,
+        isin: data.isin ?? undefined,
         nonCompliantPct: 0,
         status: "PENDING",
         requestedById: user.id,
@@ -25,7 +26,7 @@ export async function requestCompany(input: unknown) {
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return { error: "A company with this ticker already exists" };
+      return { error: "A company with this ticker or ISIN already exists" };
     }
     throw e;
   }

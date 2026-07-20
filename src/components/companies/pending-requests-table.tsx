@@ -25,6 +25,7 @@ export function PendingRequestsTable({ requests }: { requests: PendingRequest[] 
               initial={{
                 name: r.name,
                 ticker: r.ticker,
+                isin: r.isin ?? "",
                 nonCompliantPct: 0,
                 dividendPeriod: "",
                 nextDividendDate: undefined,

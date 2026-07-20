@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 type FormValues = {
   name: string;
   ticker: string;
+  isin: string;
   nonCompliantPct: number;
   dividendPeriod: string;
   nextDividendDate: string;
@@ -23,6 +24,7 @@ type Props = {
   initial?: Partial<{
     name: string;
     ticker: string;
+    isin: string;
     nonCompliantPct: number;
     dividendPeriod: string;
     /** Pass a YYYY-MM-DD string for <input type="date">. Dates are also accepted. */
@@ -60,6 +62,7 @@ export function CompanyForm({
     defaultValues: {
       name: initial?.name ?? "",
       ticker: initial?.ticker ?? "",
+      isin: initial?.isin ?? "",
       nonCompliantPct: initial?.nonCompliantPct ?? 0,
       dividendPeriod: initial?.dividendPeriod ?? "",
       nextDividendDate: initial?.nextDividendDate
@@ -104,6 +107,12 @@ export function CompanyForm({
           }}
         />
         {errors.ticker && <p className="text-sm text-destructive">{errors.ticker.message}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="isin">ISIN (optional)</Label>
+        <Input id="isin" {...register("isin")} placeholder="e.g. US0378331005" />
+        {errors.isin && <p className="text-sm text-destructive">{errors.isin.message}</p>}
       </div>
 
       <div className="space-y-2">
