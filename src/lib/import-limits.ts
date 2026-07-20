@@ -21,3 +21,23 @@ export function checkImportSize(csvText: string, dataRowCount: number): string |
   }
   return null;
 }
+
+// PDF statement uploads (see docs/superpowers/specs/2026-07-20-pdf-statement-import-design.md).
+// Generous for a real multi-page statement, bounded against a pathological
+// upload — checked before any parsing work starts.
+export const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Pure guard, checked before any PDF parsing work. Confirms the upload is
+ * within the size limit and actually starts with the PDF magic bytes
+ * (`%PDF`), rejecting anything else immediately.
+ */
+export function checkPdfUpload(buffer: Buffer): string | null {
+  if (buffer.length > MAX_PDF_BYTES) {
+    return `PDF too large: ${(buffer.length / (1024 * 1024)).toFixed(1)}MB exceeds the ${MAX_PDF_BYTES / (1024 * 1024)}MB limit`;
+  }
+  if (buffer.subarray(0, 4).toString("latin1") !== "%PDF") {
+    return "File does not look like a PDF";
+  }
+  return null;
+}
