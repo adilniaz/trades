@@ -206,3 +206,92 @@ export async function parsePdfStatement(formData: FormData): Promise<ParsePdfRes
 
   return { rows };
 }
+
+export type ConfirmPdfRow = {
+  date: string;
+  type: "BUY" | "SELL";
+  isin: string;
+  quantity: number;
+  pricePerShare: number;
+};
+
+export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportResult> {
+  const user = await requireAuth();
+
+  const skipped: { line: string; reason: string }[] = [];
+  let created = 0;
+
+  for (const row of rows) {
+    const label = `${row.date} ${row.type} ${row.isin} x${row.quantity}`;
+
+    // Re-validate through the same schema the manual form and CSV import
+    // use — the client's numbers are a proposal, not the source of truth.
+    const parsed = transactionSchema.safeParse({
+      type: row.type,
+      date: row.date,
+      shares: row.quantity,
+      pricePerShare: row.pricePerShare,
+    });
+    if (!parsed.success) {
+      skipped.push({ line: label, reason: parsed.error.issues[0]?.message ?? "Invalid row" });
+      continue;
+    }
+    const { type, date, shares, pricePerShare } = parsed.data;
+
+    // Re-resolve the company server-side by ISIN — never trust a
+    // client-supplied companyId directly.
+    const company = await matchCompanyByIsin(row.isin);
+    if (!company) {
+      skipped.push({ line: label, reason: `No approved company found for ISIN ${row.isin}` });
+      continue;
+    }
+
+    if (
+      await hasDuplicateTransaction({
+        userId: user.id,
+        companyId: company.id,
+        type,
+        date,
+        shares: row.quantity,
+      })
+    ) {
+      skipped.push({ line: label, reason: "Possible duplicate — already imported" });
+      continue;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const txn = await tx.transaction.create({
+        data: {
+          userId: user.id,
+          companyId: company.id,
+          type,
+          date,
+          shares,
+          pricePerShare,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "transaction.pdfImport",
+          targetType: "Transaction",
+          targetId: txn.id,
+          before: Prisma.DbNull,
+          after: {
+            companyTicker: company.ticker,
+            type,
+            date: date.toISOString(),
+            shares: shares ?? null,
+            pricePerShare: pricePerShare ?? null,
+          },
+        },
+      });
+    });
+
+    created++;
+  }
+
+  revalidatePath("/overview");
+  return { created, skipped };
+}
