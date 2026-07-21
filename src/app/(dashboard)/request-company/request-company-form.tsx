@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   companyRequestSchema,
@@ -13,6 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+/** Field values as they live in the form state (before zod validation).
+ * Derived manually because companyRequestSchema's `isin` transform collapses
+ * the optional key into a required-but-possibly-undefined output type —
+ * narrower than the form's actual (pre-transform) input shape. Same pattern
+ * as CompanyForm's FormValues in components/companies/company-form.tsx. */
+type FormValues = {
+  name: string;
+  ticker: string;
+  isin: string;
+};
 
 export function RequestCompanyForm() {
   const searchParams = useSearchParams();
@@ -27,8 +38,14 @@ export function RequestCompanyForm() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<CompanyRequestInput>({
-    resolver: zodResolver(companyRequestSchema),
+  } = useForm<FormValues>({
+    // companyRequestSchema's `isin` transform takes an optional string and
+    // makes the output type's `isin` key required-but-possibly-undefined,
+    // which is narrower than the form's actual (pre-transform) input shape.
+    // Cast is an assertion that FormValues matches what
+    // companyRequestSchema.safeParse actually accepts, same pattern as
+    // CompanyForm.
+    resolver: zodResolver(companyRequestSchema) as unknown as Resolver<FormValues>,
     defaultValues: {
       name: searchParams.get('name') ?? '',
       ticker: '',
@@ -36,11 +53,12 @@ export function RequestCompanyForm() {
     },
   });
 
-  const submit = async (data: CompanyRequestInput) => {
+  const submit = async (data: FormValues) => {
     setIsSubmitting(true);
     setStatus(null);
     try {
-      const result = await requestCompany(data);
+      // zodResolver already validated; the output matches CompanyRequestInput
+      const result = await requestCompany(data as unknown as CompanyRequestInput);
       if (result && typeof result === 'object' && 'error' in result) {
         setStatus({ type: 'error', message: result.error as string });
       } else {
