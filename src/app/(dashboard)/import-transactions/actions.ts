@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
+import pdfParse from "pdf-parse";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { transactionSchema } from "@/lib/validation/transaction";
-import { checkImportSize } from "@/lib/import-limits";
+import { checkImportSize, checkPdfUpload } from "@/lib/import-limits";
 import { activeCompanyWhere } from "@/lib/prisma-where";
+import { parseStatementText } from "@/lib/pdf-statement-parser";
+import { matchCompanyByIsin, hasDuplicateTransaction } from "@/lib/pdf-import-matching";
 
 export type ImportResult = {
   created: number;
@@ -116,4 +119,85 @@ export async function bulkImportTransactions(
 
   revalidatePath("/overview");
   return { created, skipped };
+}
+
+export type PdfReviewRow = {
+  id: string;
+  unparsed: boolean;
+  raw?: string;
+  date?: string;
+  type?: "BUY" | "SELL";
+  isin?: string;
+  companyName?: string;
+  quantity?: number;
+  pricePerShare?: number;
+  amount?: number;
+  matchedCompanyId?: string;
+  matchedTicker?: string;
+  isDuplicate: boolean;
+};
+
+export type ParsePdfResult = { rows: PdfReviewRow[] } | { error: string };
+
+export async function parsePdfStatement(formData: FormData): Promise<ParsePdfResult> {
+  const user = await requireAuth();
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "No file uploaded" };
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const sizeError = checkPdfUpload(buffer);
+  if (sizeError) return { error: sizeError };
+
+  let text: string;
+  try {
+    const parsed = await pdfParse(buffer);
+    text = parsed.text;
+  } catch {
+    return { error: "Could not read PDF — the file may be corrupted or password-protected" };
+  }
+
+  const parsedRows = parseStatementText(text);
+  if (parsedRows.length === 0) {
+    return { error: "No transactions found in this statement" };
+  }
+
+  const rows: PdfReviewRow[] = [];
+  for (let i = 0; i < parsedRows.length; i++) {
+    const row = parsedRows[i];
+    if ("unparsed" in row) {
+      rows.push({ id: `row-${i}`, unparsed: true, raw: row.raw, isDuplicate: false });
+      continue;
+    }
+
+    const company = await matchCompanyByIsin(row.isin);
+    const isDuplicate = company
+      ? await hasDuplicateTransaction({
+          userId: user.id,
+          companyId: company.id,
+          type: row.type,
+          date: row.date,
+          shares: row.quantity,
+        })
+      : false;
+
+    rows.push({
+      id: `row-${i}`,
+      unparsed: false,
+      date: row.date.toISOString().slice(0, 10),
+      type: row.type,
+      isin: row.isin,
+      companyName: row.companyName,
+      quantity: row.quantity,
+      pricePerShare: row.pricePerShare,
+      amount: row.amount,
+      matchedCompanyId: company?.id,
+      matchedTicker: company?.ticker,
+      isDuplicate,
+    });
+  }
+
+  return { rows };
 }
