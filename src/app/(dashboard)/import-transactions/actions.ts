@@ -213,13 +213,40 @@ export type ConfirmPdfRow = {
   isin: string;
   quantity: number;
   pricePerShare: number;
+  // Set by the client when the user left/re-checked a row that
+  // parse-time flagged as a possible duplicate — an explicit signal
+  // that they want it imported despite the duplicate flag. The
+  // duplicate check itself is still always re-run server-side; this
+  // only controls whether a real hit is skipped or imported anyway.
+  forceDuplicate?: boolean;
+};
+
+type PreparedRow = {
+  label: string;
+  type: "BUY" | "SELL" | "DIVIDEND";
+  date: Date;
+  shares?: number;
+  pricePerShare?: number;
+  companyId: string;
+  companyTicker: string;
 };
 
 export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportResult> {
   const user = await requireAuth();
 
+  const sizeError = checkImportSize(JSON.stringify(rows), rows.length);
+  if (sizeError) return { created: 0, skipped: [], error: sizeError };
+
   const skipped: { line: string; reason: string }[] = [];
   let created = 0;
+
+  // Resolve, validate, and duplicate-check every row up front — all against
+  // the DB state as it existed before this call began, before any row in
+  // this batch is created. Otherwise two legitimate, distinct rows in the
+  // same statement that look identical by the dup-check's criteria (same
+  // company/type/date/shares) would have the second one falsely flagged as
+  // a duplicate of the first once the first row is committed mid-loop.
+  const prepared: PreparedRow[] = [];
 
   for (const row of rows) {
     const label = `${row.date} ${row.type} ${row.isin} x${row.quantity}`;
@@ -246,28 +273,43 @@ export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportRes
       continue;
     }
 
-    if (
-      await hasDuplicateTransaction({
-        userId: user.id,
-        companyId: company.id,
-        type,
-        date,
-        shares: row.quantity,
-      })
-    ) {
+    // The duplicate check itself and its result are always server-derived
+    // — never trust the client's parse-time `isDuplicate` claim. Only
+    // whether a real hit blocks the import is controlled by the client via
+    // forceDuplicate.
+    const isDuplicate = await hasDuplicateTransaction({
+      userId: user.id,
+      companyId: company.id,
+      type,
+      date,
+      shares: row.quantity,
+    });
+    if (isDuplicate && !row.forceDuplicate) {
       skipped.push({ line: label, reason: "Possible duplicate — already imported" });
       continue;
     }
 
+    prepared.push({
+      label,
+      type,
+      date,
+      shares,
+      pricePerShare,
+      companyId: company.id,
+      companyTicker: company.ticker,
+    });
+  }
+
+  for (const p of prepared) {
     await prisma.$transaction(async (tx) => {
       const txn = await tx.transaction.create({
         data: {
           userId: user.id,
-          companyId: company.id,
-          type,
-          date,
-          shares,
-          pricePerShare,
+          companyId: p.companyId,
+          type: p.type,
+          date: p.date,
+          shares: p.shares,
+          pricePerShare: p.pricePerShare,
         },
       });
 
@@ -279,11 +321,11 @@ export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportRes
           targetId: txn.id,
           before: Prisma.DbNull,
           after: {
-            companyTicker: company.ticker,
-            type,
-            date: date.toISOString(),
-            shares: shares ?? null,
-            pricePerShare: pricePerShare ?? null,
+            companyTicker: p.companyTicker,
+            type: p.type,
+            date: p.date.toISOString(),
+            shares: p.shares ?? null,
+            pricePerShare: p.pricePerShare ?? null,
           },
         },
       });

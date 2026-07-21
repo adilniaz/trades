@@ -179,4 +179,70 @@ describe("confirmPdfImport", () => {
     expect(res.skipped).toHaveLength(1);
     expect(mockCreate).not.toHaveBeenCalled();
   });
+
+  it("imports a row despite a real duplicate hit when forceDuplicate is true", async () => {
+    mockMatchCompanyByIsin.mockResolvedValue(COMPANY);
+    mockHasDuplicateTransaction.mockResolvedValue(true);
+
+    const res = await confirmPdfImport([
+      {
+        date: "2025-05-13",
+        type: "BUY",
+        isin: "HK0285041858",
+        quantity: 50,
+        pricePerShare: 4.125,
+        forceDuplicate: true,
+      },
+    ]);
+
+    expect(res.created).toBe(1);
+    expect(res.skipped).toHaveLength(0);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    // The check itself is still server-derived, never skipped.
+    expect(mockHasDuplicateTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("still skips a row on a real duplicate when forceDuplicate is false/absent (regression)", async () => {
+    mockMatchCompanyByIsin.mockResolvedValue(COMPANY);
+    mockHasDuplicateTransaction.mockResolvedValue(true);
+
+    const res = await confirmPdfImport([
+      {
+        date: "2025-05-13",
+        type: "BUY",
+        isin: "HK0285041858",
+        quantity: 50,
+        pricePerShare: 4.125,
+        forceDuplicate: false,
+      },
+    ]);
+
+    expect(res.created).toBe(0);
+    expect(res.skipped[0].reason).toContain("duplicate");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates both rows when two rows in the same call are identical to each other but not to any pre-existing DB row (batch self-collision regression)", async () => {
+    mockMatchCompanyByIsin.mockResolvedValue(COMPANY);
+    // hasDuplicateTransaction always reflects only pre-existing DB state in
+    // this test double — it never sees rows created earlier in the same
+    // confirmPdfImport call, matching the fixed "prepare all, then create
+    // all" behavior.
+    mockHasDuplicateTransaction.mockResolvedValue(false);
+
+    const row = {
+      date: "2025-05-13",
+      type: "BUY" as const,
+      isin: "HK0285041858",
+      quantity: 50,
+      pricePerShare: 4.125,
+    };
+
+    const res = await confirmPdfImport([row, row]);
+
+    expect(res.created).toBe(2);
+    expect(res.skipped).toHaveLength(0);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockHasDuplicateTransaction).toHaveBeenCalledTimes(2);
+  });
 });

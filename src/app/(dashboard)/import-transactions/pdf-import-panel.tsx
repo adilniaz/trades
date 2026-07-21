@@ -56,6 +56,7 @@ export function PdfImportPanel() {
           isin: r.isin!,
           quantity: r.quantity!,
           pricePerShare: r.pricePerShare!,
+          forceDuplicate: r.isDuplicate,
         }))
       );
       setResult(res);
@@ -100,7 +101,7 @@ export function PdfImportPanel() {
                       />
                     </td>
                     {r.unparsed ? (
-                      <td colSpan={5} className="text-muted-foreground">
+                      <td colSpan={6} className="text-muted-foreground">
                         Couldn&apos;t parse: <code className="text-xs">{r.raw}</code>
                       </td>
                     ) : (
