@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockRequireAuth } = vi.hoisted(() => ({ mockRequireAuth: vi.fn() }));
-const { mockPdfParse } = vi.hoisted(() => ({ mockPdfParse: vi.fn() }));
+const { mockGetText, mockDestroy } = vi.hoisted(() => ({
+  mockGetText: vi.fn(),
+  mockDestroy: vi.fn().mockResolvedValue(undefined),
+}));
 const { mockMatchCompanyByIsin, mockHasDuplicateTransaction } = vi.hoisted(() => ({
   mockMatchCompanyByIsin: vi.fn(),
   mockHasDuplicateTransaction: vi.fn(),
@@ -9,7 +12,11 @@ const { mockMatchCompanyByIsin, mockHasDuplicateTransaction } = vi.hoisted(() =>
 
 vi.mock("@/lib/auth-guard", () => ({ requireAuth: mockRequireAuth }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("pdf-parse", () => ({ default: mockPdfParse }));
+vi.mock("pdf-parse", () => ({
+  PDFParse: vi.fn().mockImplementation(function () {
+    return { getText: mockGetText, destroy: mockDestroy };
+  }),
+}));
 vi.mock("@/lib/pdf-import-matching", () => ({
   matchCompanyByIsin: mockMatchCompanyByIsin,
   hasDuplicateTransaction: mockHasDuplicateTransaction,
@@ -36,7 +43,8 @@ function pdfFormData(bytes = "%PDF-1.4 fake content"): FormData {
 
 beforeEach(() => {
   mockRequireAuth.mockReset().mockResolvedValue(USER);
-  mockPdfParse.mockReset();
+  mockGetText.mockReset();
+  mockDestroy.mockReset().mockResolvedValue(undefined);
   mockMatchCompanyByIsin.mockReset();
   mockHasDuplicateTransaction.mockReset().mockResolvedValue(false);
 });
@@ -45,11 +53,11 @@ describe("parsePdfStatement", () => {
   it("rejects a non-PDF file before parsing", async () => {
     const res = await parsePdfStatement(pdfFormData("not a pdf"));
     expect(res).toEqual({ error: "File does not look like a PDF" });
-    expect(mockPdfParse).not.toHaveBeenCalled();
+    expect(mockGetText).not.toHaveBeenCalled();
   });
 
   it("returns a matched, non-duplicate row for a recognized BUY line", async () => {
-    mockPdfParse.mockResolvedValue({ text: STATEMENT_TEXT });
+    mockGetText.mockResolvedValue({ text: STATEMENT_TEXT });
     mockMatchCompanyByIsin.mockResolvedValue(COMPANY);
     mockHasDuplicateTransaction.mockResolvedValue(false);
 
@@ -69,7 +77,7 @@ describe("parsePdfStatement", () => {
   });
 
   it("flags a row with no matching company, leaving matchedCompanyId unset", async () => {
-    mockPdfParse.mockResolvedValue({ text: STATEMENT_TEXT });
+    mockGetText.mockResolvedValue({ text: STATEMENT_TEXT });
     mockMatchCompanyByIsin.mockResolvedValue(null);
 
     const res = await parsePdfStatement(pdfFormData());
@@ -78,7 +86,7 @@ describe("parsePdfStatement", () => {
   });
 
   it("flags a matched row as a duplicate", async () => {
-    mockPdfParse.mockResolvedValue({ text: STATEMENT_TEXT });
+    mockGetText.mockResolvedValue({ text: STATEMENT_TEXT });
     mockMatchCompanyByIsin.mockResolvedValue(COMPANY);
     mockHasDuplicateTransaction.mockResolvedValue(true);
 
@@ -88,13 +96,13 @@ describe("parsePdfStatement", () => {
   });
 
   it("returns an error when the statement has no recognizable rows", async () => {
-    mockPdfParse.mockResolvedValue({ text: "nothing to see here" });
+    mockGetText.mockResolvedValue({ text: "nothing to see here" });
     const res = await parsePdfStatement(pdfFormData());
     expect(res).toEqual({ error: "No transactions found in this statement" });
   });
 
   it("returns an error when the PDF can't be read", async () => {
-    mockPdfParse.mockRejectedValue(new Error("bad PDF"));
+    mockGetText.mockRejectedValue(new Error("bad PDF"));
     const res = await parsePdfStatement(pdfFormData());
     expect(res).toEqual({
       error: "Could not read PDF — the file may be corrupted or password-protected",

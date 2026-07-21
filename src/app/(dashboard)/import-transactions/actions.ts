@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { transactionSchema } from "@/lib/validation/transaction";
@@ -153,8 +153,13 @@ export async function parsePdfStatement(formData: FormData): Promise<ParsePdfRes
 
   let text: string;
   try {
-    const parsed = await pdfParse(buffer);
-    text = parsed.text;
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const parsed = await parser.getText();
+      text = parsed.text;
+    } finally {
+      await parser.destroy();
+    }
   } catch {
     return { error: "Could not read PDF — the file may be corrupted or password-protected" };
   }
