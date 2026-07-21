@@ -34,8 +34,14 @@ const DATE_LINE = new RegExp(
 // "Virement" for a transfer) are not trade activity and are dropped.
 const TRADE_TYPE_LABEL = "Exécution d'ordre";
 
+// The negative lookahead after the digit group keeps a fractional quantity
+// (e.g. "quantity: 1.5", plausible for a savings-plan execution — see the
+// header comment) from partial-matching as `1` and silently producing a
+// corrupted row. Fractional-share parsing isn't implemented since that
+// format is unconfirmed; failing the match here routes it to the existing
+// safe `unparsed` fallback instead.
 const TRADE_DESCRIPTION =
-  /(Buy|Sell) trade ([A-Z]{2}[A-Z0-9]{9}[0-9]) (.+?), quantity: (\d+)/;
+  /(Buy|Sell) trade ([A-Z]{2}[A-Z0-9]{9}[0-9]) (.+?), quantity: (\d+)(?![.,]\d)/;
 
 // French-formatted money: comma decimal, optional space/non-breaking-space
 // thousands separators, trailing €.

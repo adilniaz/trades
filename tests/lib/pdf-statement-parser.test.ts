@@ -89,4 +89,21 @@ describe("parseStatementText", () => {
   it("returns an empty array for text with no date-anchored rows", () => {
     expect(parseStatementText("TRANSACTIONS\nDATE TYPE DESCRIPTION")).toEqual([]);
   });
+
+  it("flags a fractional quantity as unparsed rather than silently truncating it to an integer", () => {
+    const text = [
+      "13 mai 2025 Exécution",
+      "d'ordre",
+      "Buy trade US0378331005 APPLE INC, quantity: 1.5",
+      "206,25 € 43,75 €",
+    ].join("\n");
+
+    const rows = parseStatementText(text);
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    expect(isParsed(row)).toBe(false);
+    if (isParsed(row)) throw new Error("expected an unparsed row");
+    expect(row.unparsed).toBe(true);
+    expect(row.raw).toContain("quantity: 1.5");
+  });
 });
