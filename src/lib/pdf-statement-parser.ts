@@ -10,24 +10,49 @@
 // silently dropped, so a future DIVIDEND format can be added here once
 // confirmed — until then those rows need manual entry.
 
+// Trade Republic abbreviates most month names (with a trailing period) in
+// the date column — only the already-short mars/mai/juin/août are spelled
+// out in full. Map both forms to the same index.
 const FRENCH_MONTHS: Record<string, number> = {
   janvier: 0,
+  'janv.': 0,
   février: 1,
+  'févr.': 1,
   mars: 2,
   avril: 3,
+  'avr.': 3,
   mai: 4,
   juin: 5,
   juillet: 6,
+  'juil.': 6,
   août: 7,
   septembre: 8,
+  'sept.': 8,
   octobre: 9,
+  'oct.': 9,
   novembre: 10,
+  'nov.': 10,
   décembre: 11,
+  'déc.': 11,
 };
 
 const DATE_LINE = new RegExp(
-  `^(\\d{1,2}) (${Object.keys(FRENCH_MONTHS).join("|")}) (\\d{4})`
+  `^(\\d{1,2}) (${Object.keys(FRENCH_MONTHS)
+    .map((m) => m.replace('.', '\\.'))
+    .join('|')}) (\\d{4})`,
 );
+
+// A row's "<day> <month>" and its "<year>" occasionally land on two
+// separate physical lines (observed whenever the TYPE column's own label
+// wraps, e.g. "Exécution d'ordre" — shifts the rest of that row's layout).
+// Not matched by DATE_LINE on either line alone, so silently merges into
+// the previous buffer as noise unless rejoined first.
+const DAY_MONTH_ONLY_LINE = new RegExp(
+  `^\\d{1,2} (${Object.keys(FRENCH_MONTHS)
+    .map((m) => m.replace('.', '\\.'))
+    .join('|')})$`,
+);
+const YEAR_LEAD_LINE = /^\d{4}\b/;
 
 // Trade Republic's TYPE column label for a buy/sell order execution.
 // Confirmed via a redacted reference statement. Other TYPE values (e.g.
@@ -49,7 +74,7 @@ const MONEY = /(-?[\d\s ]{1,12},\d{2})\s?€/g;
 
 export type ParsedTradeRow = {
   date: Date;
-  type: "BUY" | "SELL";
+  type: 'BUY' | 'SELL';
   isin: string;
   companyName: string;
   quantity: number;
@@ -68,7 +93,7 @@ function parseFrenchDate(day: string, month: string, year: string): Date {
 }
 
 function parseFrenchAmount(raw: string): number {
-  const cleaned = raw.replace(/[\s ]/g, "").replace(",", ".");
+  const cleaned = raw.replace(/[\s ]/g, '').replace(',', '.');
   return Number(cleaned);
 }
 
@@ -110,12 +135,14 @@ function parseRow(buffer: string): ParsedTradeRow | UnparsedRow | null {
 
   return {
     date,
-    type: descMatch[1] === "Buy" ? "BUY" : "SELL",
+    type: descMatch[1] === 'Buy' ? 'BUY' : 'SELL',
     isin: descMatch[2],
     companyName: descMatch[3].trim(),
     quantity,
     amount,
-    pricePerShare: amount / quantity,
+    // Round away float division noise (e.g. 41.836666666666666) — 4dp is
+    // more precision than a real per-share price ever carries.
+    pricePerShare: Math.round((amount / quantity) * 10000) / 10000,
   };
 }
 
@@ -125,18 +152,32 @@ function parseRow(buffer: string): ParsedTradeRow | UnparsedRow | null {
  * then parses each into a trade row, an unparsed-but-trade-shaped row, or
  * drops it if it's not a trade-execution row at all.
  */
-export function parseStatementText(text: string): (ParsedTradeRow | UnparsedRow)[] {
-  const lines = text
-    .split("\n")
+export function parseStatementText(
+  text: string,
+): (ParsedTradeRow | UnparsedRow)[] {
+  const rawLines = text
+    .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
+
+  const lines: string[] = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    const next = rawLines[i + 1];
+    if (DAY_MONTH_ONLY_LINE.test(line) && next && YEAR_LEAD_LINE.test(next)) {
+      lines.push(`${line} ${next}`);
+      i++;
+    } else {
+      lines.push(line);
+    }
+  }
 
   const buffers: string[] = [];
   for (const line of lines) {
     if (DATE_LINE.test(line)) {
       buffers.push(line);
     } else if (buffers.length > 0) {
-      buffers[buffers.length - 1] += " " + line;
+      buffers[buffers.length - 1] += ' ' + line;
     }
   }
 
