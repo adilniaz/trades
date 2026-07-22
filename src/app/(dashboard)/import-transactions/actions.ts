@@ -24,7 +24,7 @@ export type ImportResult = {
 export async function bulkImportTransactions(
   csvText: string,
 ): Promise<ImportResult> {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
 
   const lines = csvText
     .split('\n')
@@ -162,7 +162,7 @@ export type ParsePdfResult = { rows: PdfReviewRow[] } | { error: string };
 export async function parsePdfStatement(
   formData: FormData,
 ): Promise<ParsePdfResult> {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
 
   const file = formData.get('file');
   if (!(file instanceof File)) {
@@ -268,7 +268,7 @@ type PreparedRow = {
 export async function confirmPdfImport(
   rows: ConfirmPdfRow[],
 ): Promise<ImportResult> {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
 
   const sizeError = checkImportSize(JSON.stringify(rows), rows.length);
   if (sizeError) return { created: 0, skipped: [], error: sizeError };

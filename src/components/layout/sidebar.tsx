@@ -105,34 +105,19 @@ function NavLinks({
   pendingCount?: number;
   pathname: string;
 }) {
+  const items = role === 'ADMIN' ? adminNav : userNav;
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        {userNav.map((item) => (
-          <NavLink
-            key={item.href}
-            item={item}
-            active={pathname.startsWith(item.href)}
-          />
-        ))}
-      </div>
-      {role === 'ADMIN' && (
-        <div className="space-y-1">
-          <div className="px-3 pb-1 text-xs font-medium tracking-wide text-sidebar-foreground/50 uppercase">
-            Admin
-          </div>
-          {adminNav.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={pathname.startsWith(item.href)}
-              pendingCount={
-                item.href === '/admin/companies' ? pendingCount : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
+    <div className="space-y-1">
+      {items.map((item) => (
+        <NavLink
+          key={item.href}
+          item={item}
+          active={pathname.startsWith(item.href)}
+          pendingCount={
+            item.href === '/admin/companies' ? pendingCount : undefined
+          }
+        />
+      ))}
     </div>
   );
 }

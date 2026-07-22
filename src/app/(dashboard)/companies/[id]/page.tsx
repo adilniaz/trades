@@ -22,7 +22,7 @@ export default async function CompanyDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
   const { id } = await params;
   const settings = await getSettings();
 

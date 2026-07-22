@@ -1,22 +1,22 @@
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-guard";
-import { position } from "@/lib/calculations";
-import { toTxn } from "@/lib/to-txn";
-import { activeTransactionWhere } from "@/lib/prisma-where";
+import { revalidatePath } from 'next/cache';
+import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth-guard';
+import { position } from '@/lib/calculations';
+import { toTxn } from '@/lib/to-txn';
+import { activeTransactionWhere } from '@/lib/prisma-where';
 import {
   transactionSchema,
   type TransactionInput,
-} from "@/lib/validation/transaction";
+} from '@/lib/validation/transaction';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function normalizeTransactionFields(data: TransactionInput) {
-  if (data.type === "DIVIDEND") {
+  if (data.type === 'DIVIDEND') {
     return { ...data, shares: undefined, pricePerShare: undefined };
   }
   return { ...data, amount: undefined };
@@ -28,7 +28,7 @@ function normalizeTransactionFields(data: TransactionInput) {
 async function getLivePosition(
   companyId: string,
   userId: string,
-  excludeTransactionId?: string
+  excludeTransactionId?: string,
 ): Promise<number> {
   const rows = await prisma.transaction.findMany({
     where: activeTransactionWhere({
@@ -46,9 +46,9 @@ async function getLivePosition(
 
 export async function addTransaction(
   companyId: string,
-  input: TransactionInput
+  input: TransactionInput,
 ) {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
 
   const parsed = transactionSchema.safeParse(input);
   if (!parsed.success) {
@@ -59,18 +59,20 @@ export async function addTransaction(
   const company = await prisma.company.findUnique({
     where: { id: companyId },
   });
-  if (!company || company.deletedAt || company.status !== "APPROVED") {
-    return { error: "Company not found or not available" };
+  if (!company || company.deletedAt || company.status !== 'APPROVED') {
+    return { error: 'Company not found or not available' };
   }
 
   const normalized = normalizeTransactionFields(parsed.data);
 
-  if (normalized.type === "SELL") {
+  if (normalized.type === 'SELL') {
     const currentPosition = await getLivePosition(companyId, user.id);
     if ((normalized.shares ?? 0) > currentPosition) {
       return {
         error: {
-          shares: [`Cannot sell ${normalized.shares} shares — only ${currentPosition} currently held`],
+          shares: [
+            `Cannot sell ${normalized.shares} shares — only ${currentPosition} currently held`,
+          ],
         },
       };
     }
@@ -80,7 +82,7 @@ export async function addTransaction(
     data: {
       userId: user.id,
       companyId,
-      type: normalized.type as "BUY" | "SELL" | "DIVIDEND",
+      type: normalized.type as 'BUY' | 'SELL' | 'DIVIDEND',
       date: normalized.date,
       shares: normalized.shares,
       pricePerShare: normalized.pricePerShare,
@@ -89,7 +91,7 @@ export async function addTransaction(
   });
 
   revalidatePath(`/companies/${companyId}`);
-  revalidatePath("/overview");
+  revalidatePath('/overview');
   return { success: true };
 }
 
@@ -100,9 +102,9 @@ export async function addTransaction(
 export async function updateTransaction(
   id: string,
   companyId: string,
-  input: TransactionInput
+  input: TransactionInput,
 ) {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
 
   const parsed = transactionSchema.safeParse(input);
   if (!parsed.success) {
@@ -111,12 +113,14 @@ export async function updateTransaction(
 
   const normalized = normalizeTransactionFields(parsed.data);
 
-  if (normalized.type === "SELL") {
+  if (normalized.type === 'SELL') {
     const currentPosition = await getLivePosition(companyId, user.id, id);
     if ((normalized.shares ?? 0) > currentPosition) {
       return {
         error: {
-          shares: [`Cannot sell ${normalized.shares} shares — only ${currentPosition} currently held`],
+          shares: [
+            `Cannot sell ${normalized.shares} shares — only ${currentPosition} currently held`,
+          ],
         },
       };
     }
@@ -125,7 +129,7 @@ export async function updateTransaction(
   const result = await prisma.transaction.updateMany({
     where: activeTransactionWhere({ id, userId: user.id }),
     data: {
-      type: normalized.type as "BUY" | "SELL" | "DIVIDEND",
+      type: normalized.type as 'BUY' | 'SELL' | 'DIVIDEND',
       date: normalized.date,
       shares: normalized.shares,
       pricePerShare: normalized.pricePerShare,
@@ -134,11 +138,11 @@ export async function updateTransaction(
   });
 
   if (result.count === 0) {
-    return { error: "Transaction not found" };
+    return { error: 'Transaction not found' };
   }
 
   revalidatePath(`/companies/${companyId}`);
-  revalidatePath("/overview");
+  revalidatePath('/overview');
   return { success: true };
 }
 
@@ -147,7 +151,7 @@ export async function updateTransaction(
 // ---------------------------------------------------------------------------
 
 export async function deleteTransaction(id: string, companyId: string) {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
 
   const result = await prisma.transaction.updateMany({
     where: activeTransactionWhere({ id, userId: user.id }),
@@ -155,11 +159,11 @@ export async function deleteTransaction(id: string, companyId: string) {
   });
 
   if (result.count === 0) {
-    return { error: "Transaction not found" };
+    return { error: 'Transaction not found' };
   }
 
   revalidatePath(`/companies/${companyId}`);
-  revalidatePath("/overview");
+  revalidatePath('/overview');
   return { success: true };
 }
 
@@ -168,11 +172,15 @@ export async function deleteTransaction(id: string, companyId: string) {
 // ---------------------------------------------------------------------------
 
 export async function markPurified(companyId: string) {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
   await prisma.transaction.updateMany({
-    where: activeTransactionWhere({ companyId, userId: user.id, purifiedAt: null }),
+    where: activeTransactionWhere({
+      companyId,
+      userId: user.id,
+      purifiedAt: null,
+    }),
     data: { purifiedAt: new Date() },
   });
   revalidatePath(`/companies/${companyId}`);
-  revalidatePath("/overview");
+  revalidatePath('/overview');
 }

@@ -6,7 +6,7 @@ import { PageHeading } from '@/components/layout/page-heading';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default async function SettingsPage() {
-  await requireAuth();
+  await requireAuth({ roles: ['USER'] });
   const { transactionFee } = await getSettings();
 
   return (

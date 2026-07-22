@@ -10,7 +10,7 @@ import { PurityBar } from '@/components/ui/purity-bar';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default async function OverviewPage() {
-  const user = await requireAuth();
+  const user = await requireAuth({ roles: ['USER'] });
   const settings = await getSettings();
 
   const companies = await prisma.company.findMany({
