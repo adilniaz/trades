@@ -21,14 +21,20 @@ export default function ImportTransactionsPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <PageHeading>Import transactions</PageHeading>
 
       <div className="flex gap-2">
-        <Button variant={tab === 'csv' ? 'default' : 'outline'} onClick={() => setTab('csv')}>
+        <Button
+          variant={tab === 'csv' ? 'default' : 'outline'}
+          onClick={() => setTab('csv')}
+        >
           Paste CSV
         </Button>
-        <Button variant={tab === 'pdf' ? 'default' : 'outline'} onClick={() => setTab('pdf')}>
+        <Button
+          variant={tab === 'pdf' ? 'default' : 'outline'}
+          onClick={() => setTab('pdf')}
+        >
           Upload PDF
         </Button>
       </div>
@@ -41,8 +47,8 @@ export default function ImportTransactionsPage() {
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Format: <code>date,ticker,type,shares,pricePerShare,amount</code>{' '}
-              (header row required). For DIVIDEND types, set amount; for BUY/SELL,
-              set shares and pricePerShare.
+              (header row required). For DIVIDEND types, set amount; for
+              BUY/SELL, set shares and pricePerShare.
             </p>
             <textarea
               className="w-full h-48 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -50,7 +56,10 @@ export default function ImportTransactionsPage() {
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
             />
-            <Button onClick={handleImport} disabled={isPending || !csvText.trim()}>
+            <Button
+              onClick={handleImport}
+              disabled={isPending || !csvText.trim()}
+            >
               {isPending ? 'Importing…' : 'Import'}
             </Button>
           </CardContent>
@@ -80,7 +89,9 @@ export default function ImportTransactionsPage() {
               <>
                 <p className="text-sm">
                   Created:{' '}
-                  <span className="font-semibold text-primary">{result.created}</span>
+                  <span className="font-semibold text-primary">
+                    {result.created}
+                  </span>
                 </p>
                 {result.skipped.length > 0 && (
                   <div className="space-y-1">
@@ -90,7 +101,9 @@ export default function ImportTransactionsPage() {
                     <ul className="text-xs text-muted-foreground space-y-0.5 max-h-48 overflow-y-auto">
                       {result.skipped.map((s, i) => (
                         <li key={i}>
-                          <code className="text-xs bg-muted px-1 rounded">{s.line}</code>
+                          <code className="text-xs bg-muted px-1 rounded">
+                            {s.line}
+                          </code>
                           {' — '}
                           {s.reason}
                         </li>
