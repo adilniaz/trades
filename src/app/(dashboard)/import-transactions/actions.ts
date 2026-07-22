@@ -1,15 +1,19 @@
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
-import { PDFParse } from "pdf-parse";
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-guard";
-import { transactionSchema } from "@/lib/validation/transaction";
-import { checkImportSize, checkPdfUpload } from "@/lib/import-limits";
-import { activeCompanyWhere } from "@/lib/prisma-where";
-import { parseStatementText } from "@/lib/pdf-statement-parser";
-import { matchCompanyByIsin, hasDuplicateTransaction } from "@/lib/pdf-import-matching";
+import { revalidatePath } from 'next/cache';
+import { Prisma } from '@prisma/client';
+import { PDFParse } from 'pdf-parse';
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { requireAuth } from '@/lib/auth-guard';
+import { transactionSchema } from '@/lib/validation/transaction';
+import { checkImportSize, checkPdfUpload } from '@/lib/import-limits';
+import { activeCompanyWhere } from '@/lib/prisma-where';
+import { parseStatementText } from '@/lib/pdf-statement-parser';
+import {
+  matchCompanyByIsin,
+  hasDuplicateTransaction,
+} from '@/lib/pdf-import-matching';
 
 export type ImportResult = {
   created: number;
@@ -18,12 +22,12 @@ export type ImportResult = {
 };
 
 export async function bulkImportTransactions(
-  csvText: string
+  csvText: string,
 ): Promise<ImportResult> {
   const user = await requireAuth();
 
   const lines = csvText
-    .split("\n")
+    .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
@@ -33,8 +37,15 @@ export async function bulkImportTransactions(
 
   // Check header
   const header = lines[0].toLowerCase();
-  if (!header.includes("date") || !header.includes("ticker") || !header.includes("type")) {
-    return { created: 0, skipped: [{ line: lines[0], reason: "Invalid header" }] };
+  if (
+    !header.includes('date') ||
+    !header.includes('ticker') ||
+    !header.includes('type')
+  ) {
+    return {
+      created: 0,
+      skipped: [{ line: lines[0], reason: 'Invalid header' }],
+    };
   }
 
   const sizeError = checkImportSize(csvText, lines.length - 1);
@@ -47,9 +58,12 @@ export async function bulkImportTransactions(
     const line = lines[i];
     if (!line) continue;
 
-    const parts = line.split(",").map((p) => p.trim());
+    const parts = line.split(',').map((p) => p.trim());
     if (parts.length < 4) {
-      skipped.push({ line, reason: `Expected at least 4 columns (date,ticker,type,shares,pricePerShare,amount), got ${parts.length}` });
+      skipped.push({
+        line,
+        reason: `Expected at least 4 columns (date,ticker,type,shares,pricePerShare,amount), got ${parts.length}`,
+      });
       continue;
     }
 
@@ -65,7 +79,10 @@ export async function bulkImportTransactions(
       amount: amountStr || undefined,
     });
     if (!parsed.success) {
-      skipped.push({ line, reason: parsed.error.issues[0]?.message ?? "Invalid row" });
+      skipped.push({
+        line,
+        reason: parsed.error.issues[0]?.message ?? 'Invalid row',
+      });
       continue;
     }
     const { type: txnType, date, shares, pricePerShare, amount } = parsed.data;
@@ -74,8 +91,11 @@ export async function bulkImportTransactions(
       where: activeCompanyWhere({ ticker: ticker.toUpperCase() }),
     });
 
-    if (!company || company.status !== "APPROVED") {
-      skipped.push({ line, reason: `Company not found or not approved: ${ticker}` });
+    if (!company || company.status !== 'APPROVED') {
+      skipped.push({
+        line,
+        reason: `Company not found or not approved: ${ticker}`,
+      });
       continue;
     }
 
@@ -89,17 +109,17 @@ export async function bulkImportTransactions(
           companyId: company.id,
           type: txnType,
           date,
-          shares: txnType === "DIVIDEND" ? undefined : shares,
-          pricePerShare: txnType === "DIVIDEND" ? undefined : pricePerShare,
-          amount: txnType === "DIVIDEND" ? amount : undefined,
+          shares: txnType === 'DIVIDEND' ? undefined : shares,
+          pricePerShare: txnType === 'DIVIDEND' ? undefined : pricePerShare,
+          amount: txnType === 'DIVIDEND' ? amount : undefined,
         },
       });
 
       await tx.auditLog.create({
         data: {
           actorId: user.id,
-          action: "transaction.bulkImport",
-          targetType: "Transaction",
+          action: 'transaction.bulkImport',
+          targetType: 'Transaction',
           targetId: txn.id,
           before: Prisma.DbNull,
           after: {
@@ -117,7 +137,7 @@ export async function bulkImportTransactions(
     created++;
   }
 
-  revalidatePath("/overview");
+  revalidatePath('/overview');
   return { created, skipped };
 }
 
@@ -126,7 +146,7 @@ export type PdfReviewRow = {
   unparsed: boolean;
   raw?: string;
   date?: string;
-  type?: "BUY" | "SELL";
+  type?: 'BUY' | 'SELL';
   isin?: string;
   companyName?: string;
   quantity?: number;
@@ -139,12 +159,14 @@ export type PdfReviewRow = {
 
 export type ParsePdfResult = { rows: PdfReviewRow[] } | { error: string };
 
-export async function parsePdfStatement(formData: FormData): Promise<ParsePdfResult> {
+export async function parsePdfStatement(
+  formData: FormData,
+): Promise<ParsePdfResult> {
   const user = await requireAuth();
 
-  const file = formData.get("file");
+  const file = formData.get('file');
   if (!(file instanceof File)) {
-    return { error: "No file uploaded" };
+    return { error: 'No file uploaded' };
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -160,20 +182,32 @@ export async function parsePdfStatement(formData: FormData): Promise<ParsePdfRes
     } finally {
       await parser.destroy();
     }
-  } catch {
-    return { error: "Could not read PDF — the file may be corrupted or password-protected" };
+  } catch (err) {
+    logger.error(
+      { msg: err instanceof Error ? err.message : String(err) },
+      'PDF parse failed',
+    );
+    return {
+      error:
+        'Could not read PDF — the file may be corrupted or password-protected',
+    };
   }
 
   const parsedRows = parseStatementText(text);
   if (parsedRows.length === 0) {
-    return { error: "No transactions found in this statement" };
+    return { error: 'No transactions found in this statement' };
   }
 
   const rows: PdfReviewRow[] = [];
   for (let i = 0; i < parsedRows.length; i++) {
     const row = parsedRows[i];
-    if ("unparsed" in row) {
-      rows.push({ id: `row-${i}`, unparsed: true, raw: row.raw, isDuplicate: false });
+    if ('unparsed' in row) {
+      rows.push({
+        id: `row-${i}`,
+        unparsed: true,
+        raw: row.raw,
+        isDuplicate: false,
+      });
       continue;
     }
 
@@ -209,7 +243,7 @@ export async function parsePdfStatement(formData: FormData): Promise<ParsePdfRes
 
 export type ConfirmPdfRow = {
   date: string;
-  type: "BUY" | "SELL";
+  type: 'BUY' | 'SELL';
   isin: string;
   quantity: number;
   pricePerShare: number;
@@ -223,7 +257,7 @@ export type ConfirmPdfRow = {
 
 type PreparedRow = {
   label: string;
-  type: "BUY" | "SELL" | "DIVIDEND";
+  type: 'BUY' | 'SELL' | 'DIVIDEND';
   date: Date;
   shares?: number;
   pricePerShare?: number;
@@ -231,7 +265,9 @@ type PreparedRow = {
   companyTicker: string;
 };
 
-export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportResult> {
+export async function confirmPdfImport(
+  rows: ConfirmPdfRow[],
+): Promise<ImportResult> {
   const user = await requireAuth();
 
   const sizeError = checkImportSize(JSON.stringify(rows), rows.length);
@@ -260,7 +296,10 @@ export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportRes
       pricePerShare: row.pricePerShare,
     });
     if (!parsed.success) {
-      skipped.push({ line: label, reason: parsed.error.issues[0]?.message ?? "Invalid row" });
+      skipped.push({
+        line: label,
+        reason: parsed.error.issues[0]?.message ?? 'Invalid row',
+      });
       continue;
     }
     const { type, date, shares, pricePerShare } = parsed.data;
@@ -269,7 +308,10 @@ export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportRes
     // client-supplied companyId directly.
     const company = await matchCompanyByIsin(row.isin);
     if (!company) {
-      skipped.push({ line: label, reason: `No approved company found for ISIN ${row.isin}` });
+      skipped.push({
+        line: label,
+        reason: `No approved company found for ISIN ${row.isin}`,
+      });
       continue;
     }
 
@@ -285,7 +327,10 @@ export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportRes
       shares: row.quantity,
     });
     if (isDuplicate && !row.forceDuplicate) {
-      skipped.push({ line: label, reason: "Possible duplicate — already imported" });
+      skipped.push({
+        line: label,
+        reason: 'Possible duplicate — already imported',
+      });
       continue;
     }
 
@@ -316,8 +361,8 @@ export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportRes
       await tx.auditLog.create({
         data: {
           actorId: user.id,
-          action: "transaction.pdfImport",
-          targetType: "Transaction",
+          action: 'transaction.pdfImport',
+          targetType: 'Transaction',
           targetId: txn.id,
           before: Prisma.DbNull,
           after: {
@@ -334,6 +379,6 @@ export async function confirmPdfImport(rows: ConfirmPdfRow[]): Promise<ImportRes
     created++;
   }
 
-  revalidatePath("/overview");
+  revalidatePath('/overview');
   return { created, skipped };
 }
